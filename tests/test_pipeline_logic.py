@@ -1,6 +1,15 @@
+from datetime import date
+
 import pytest
 
-from pipeline.logic import InvalidTransition, status_for_stage, validate_transition
+from pipeline.logic import (
+    InvalidTransition,
+    conversion_rates_by_source,
+    days_in_stage,
+    is_stale,
+    status_for_stage,
+    validate_transition,
+)
 
 ACTIVE_STAGES = ["applied", "phone_screen", "technical_assessment",
                  "interview", "final_round", "offer"]
@@ -56,3 +65,91 @@ def test_active_stages_keep_status_active(stage):
 @pytest.mark.parametrize("stage", ["rejected", "withdrawn"])
 def test_terminal_stage_sets_matching_status(stage):
     assert status_for_stage(stage) == stage
+
+
+# ---------- days_in_stage ----------
+
+TODAY = date(2026, 10, 20)
+
+
+def test_days_in_stage_is_zero_on_the_day_it_entered():
+    assert days_in_stage(date(2026, 10, 20), TODAY) == 0
+
+
+def test_days_in_stage_counts_whole_days():
+    assert days_in_stage(date(2026, 10, 1), TODAY) == 19
+
+
+# ---------- is_stale ----------
+
+def test_active_application_past_threshold_is_stale():
+    assert is_stale("active", date(2026, 10, 1), TODAY, threshold_days=14) is True
+
+
+def test_active_application_exactly_at_threshold_is_not_stale():
+    assert is_stale("active", date(2026, 10, 6), TODAY, threshold_days=14) is False
+
+
+def test_recent_active_application_is_not_stale():
+    assert is_stale("active", date(2026, 10, 18), TODAY, threshold_days=14) is False
+
+
+@pytest.mark.parametrize("status", ["rejected", "withdrawn"])
+def test_closed_application_is_never_stale(status):
+    assert is_stale(status, date(2026, 1, 1), TODAY, threshold_days=14) is False
+
+
+# ---------- conversion_rates_by_source ----------
+
+def _rate(rows, from_stage):
+    """Find the row for one step, e.g. applied -> phone_screen."""
+    return next(r for r in rows if r["from_stage"] == from_stage)
+
+
+def test_conversion_rates_for_one_source():
+    # Arrange: max stage reached = applied, phone_screen, interview (skip), phone_screen
+    applications = [
+        {"source": "referral", "stages": ["applied"]},
+        {"source": "referral", "stages": ["applied", "phone_screen"]},
+        {"source": "referral", "stages": ["applied", "interview"]},
+        {"source": "referral", "stages": ["applied", "phone_screen", "rejected"]},
+    ]
+
+    # Act
+    rows = conversion_rates_by_source(applications)["referral"]
+
+    # Assert
+    first = _rate(rows, "applied")
+    assert (first["reached"], first["advanced"], first["rate"]) == (4, 3, 0.75)
+    # The skip to interview counts as passing through phone_screen and technical_assessment
+    assert _rate(rows, "phone_screen")["rate"] == pytest.approx(1 / 3)
+    assert _rate(rows, "technical_assessment")["rate"] == 1.0
+    assert _rate(rows, "interview")["rate"] == 0.0
+    # Nobody reached final_round, so there is no rate to compute
+    assert _rate(rows, "final_round")["rate"] is None
+
+
+def test_conversion_rates_are_grouped_by_source():
+    applications = [
+        {"source": "referral", "stages": ["applied", "phone_screen"]},
+        {"source": "job_board", "stages": ["applied"]},
+        {"source": "job_board", "stages": ["applied"]},
+    ]
+
+    result = conversion_rates_by_source(applications)
+
+    assert set(result) == {"referral", "job_board"}
+    assert _rate(result["referral"], "applied")["rate"] == 1.0
+    assert _rate(result["job_board"], "applied")["rate"] == 0.0
+
+
+def test_terminal_stages_do_not_count_as_progress():
+    applications = [{"source": "cold_apply", "stages": ["applied", "withdrawn"]}]
+
+    rows = conversion_rates_by_source(applications)["cold_apply"]
+
+    assert _rate(rows, "applied")["advanced"] == 0
+
+
+def test_conversion_rates_with_no_applications():
+    assert conversion_rates_by_source([]) == {}

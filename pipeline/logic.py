@@ -41,3 +41,47 @@ def status_for_stage(stage):
     if stage in TERMINAL_STAGES:
         return stage
     return "active"
+
+
+def days_in_stage(entered_on, today):
+    """Whole days since the application entered its current stage (both are dates)."""
+    return (today - entered_on).days
+
+
+def is_stale(status, entered_on, today, threshold_days):
+    """An active application with no stage movement for more than threshold_days."""
+    if status != "active":
+        return False
+    return days_in_stage(entered_on, today) > threshold_days
+
+
+def conversion_rates_by_source(applications):
+    """For each source, the share of applications that moved past each active stage.
+
+    applications: list of {"source": str, "stages": [every stage from stage_history]}
+    Returns {source: [{"from_stage", "to_stage", "reached", "advanced", "rate"}, ...]}
+    """
+    # Highest active stage number each application reached, grouped by source.
+    # Terminal rows (rejected/withdrawn) are ignored: they are exits, not progress.
+    max_reached_by_source = {}
+    for app in applications:
+        numbers = [STAGE_ORDER[s] for s in app["stages"] if s in STAGE_ORDER]
+        max_reached_by_source.setdefault(app["source"], []).append(max(numbers))
+
+    ordered_stages = sorted(STAGE_ORDER, key=STAGE_ORDER.get)
+    result = {}
+    for source, max_reached in max_reached_by_source.items():
+        rows = []
+        for from_stage, to_stage in zip(ordered_stages, ordered_stages[1:]):
+            # ">=" because skipping a stage still means you got past it.
+            reached = sum(1 for m in max_reached if m >= STAGE_ORDER[from_stage])
+            advanced = sum(1 for m in max_reached if m >= STAGE_ORDER[to_stage])
+            rows.append({
+                "from_stage": from_stage,
+                "to_stage": to_stage,
+                "reached": reached,
+                "advanced": advanced,
+                "rate": advanced / reached if reached else None,
+            })
+        result[source] = rows
+    return result
