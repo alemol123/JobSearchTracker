@@ -20,3 +20,4 @@ Then open http://localhost:8000.
 | `PORT` | `8000` | Port the server listens on (always binds `0.0.0.0`) |
 | `DATA_DIR` | `./data` | Folder where the SQLite database file is stored |
 | `STALE_DAYS` | `14` | Days without stage movement before an application is flagged stale |
+| `SECRET_KEY` | `dev-only-change-me` | Signs the session cookie used for flash messages; set a random value outside local use |

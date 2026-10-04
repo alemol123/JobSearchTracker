@@ -4,6 +4,7 @@ import pytest
 
 from pipeline.logic import (
     InvalidTransition,
+    allowed_next_stages,
     conversion_rates_by_source,
     days_in_stage,
     is_stale,
@@ -205,3 +206,20 @@ def test_min_salary_above_max_is_an_error():
     _, errors = parse_application_form(_form(salary_range_min="60000", salary_range_max="50000"))
 
     assert any("cannot be higher" in e for e in errors)
+
+
+# ---------- allowed_next_stages ----------
+
+def test_next_stages_from_applied_are_all_later_stages_plus_terminal():
+    assert allowed_next_stages("applied") == [
+        "phone_screen", "technical_assessment", "interview", "final_round", "offer",
+        "rejected", "withdrawn",
+    ]
+
+
+def test_next_stages_from_offer_are_only_terminal():
+    assert allowed_next_stages("offer") == ["rejected", "withdrawn"]
+
+
+def test_closed_application_has_no_next_stages():
+    assert allowed_next_stages("rejected") == []

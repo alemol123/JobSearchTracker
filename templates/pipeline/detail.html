@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}{{ application.company }} · Job Search Tracker{% endblock %}
+{% block content %}
+<h2>{{ application.company }} — {{ application.role }}</h2>
+
+<p>Current stage: <strong>{{ application.current_stage }}</strong>
+   ({{ application.days_in_stage }} days{% if application.stale %}, <span class="badge stale">stale</span>{% endif %})</p>
+<p>Status: {{ application.status }} · Source: {{ application.source|replace("_", " ") }}
+   · Applied: {{ application.date_applied }}</p>
+{% if application.salary_range_min or application.salary_range_max %}
+<p>Salary range: {{ application.salary_range_min or "?" }} – {{ application.salary_range_max or "?" }}</p>
+{% endif %}
+
+<h3>Move to stage</h3>
+{% if next_stages %}
+<form method="post" action="{{ url_for('pipeline.change_stage', app_id=application.id) }}">
+  <select name="stage">
+    {% for s in next_stages %}<option value="{{ s }}">{{ s|replace("_", " ") }}</option>{% endfor %}
+  </select>
+  <button type="submit">Move</button>
+</form>
+{% else %}
+<p class="muted">This application is closed and can't move any more.</p>
+{% endif %}
+
+<h3>Stage history</h3>
+<ol>
+  {% for h in history %}
+  <li>{{ h.stage|replace("_", " ") }} — {{ h.entered_at|replace("T", " ") }}</li>
+  {% endfor %}
+</ol>
+{% endblock %}

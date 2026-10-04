@@ -40,6 +40,18 @@ def validate_transition(current_stage, new_stage):
         raise InvalidTransition(f"Cannot move backwards from {current_stage} to {new_stage}.")
 
 
+def allowed_next_stages(current_stage):
+    """Every stage validate_transition would accept from here, in pipeline order."""
+    allowed = []
+    for stage in list(STAGE_ORDER) + sorted(TERMINAL_STAGES):
+        try:
+            validate_transition(current_stage, stage)
+            allowed.append(stage)
+        except InvalidTransition:
+            pass
+    return allowed
+
+
 def status_for_stage(stage):
     """The applications.status value that goes with a stage."""
     if stage in TERMINAL_STAGES:

@@ -4,15 +4,21 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Job Search Tracker{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
   <header>
-    <h1>Job Search Tracker</h1>
+    <h1><a href="{{ url_for('pipeline.list_view') }}">Job Search Tracker</a></h1>
+    <nav>
+      <a href="{{ url_for('pipeline.list_view') }}">Applications</a>
+      <a href="{{ url_for('pipeline.new') }}">New application</a>
+    </nav>
   </header>
   <main>
-    {% block content %}
-    <p>Track your job applications and the skills they require.</p>
-    {% endblock %}
+    {% for category, message in get_flashed_messages(with_categories=true) %}
+      <p class="flash {{ category }}">{{ message }}</p>
+    {% endfor %}
+    {% block content %}{% endblock %}
   </main>
 </body>
 </html>
