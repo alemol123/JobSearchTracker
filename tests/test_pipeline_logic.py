@@ -7,6 +7,7 @@ from pipeline.logic import (
     conversion_rates_by_source,
     days_in_stage,
     is_stale,
+    parse_application_form,
     status_for_stage,
     validate_transition,
 )
@@ -153,3 +154,54 @@ def test_terminal_stages_do_not_count_as_progress():
 
 def test_conversion_rates_with_no_applications():
     assert conversion_rates_by_source([]) == {}
+
+
+# ---------- parse_application_form ----------
+
+def _form(**overrides):
+    form = {
+        "company": "Acme",
+        "role": "Backend Developer",
+        "source": "referral",
+        "date_applied": "2026-10-01",
+        "salary_range_min": "40000",
+        "salary_range_max": "50000",
+    }
+    form.update(overrides)
+    return form
+
+
+def test_valid_form_is_parsed_into_typed_values():
+    data, errors = parse_application_form(_form(company="  Acme  "))
+
+    assert errors == []
+    assert data["company"] == "Acme"
+    assert data["date_applied"] == date(2026, 10, 1)
+    assert (data["salary_range_min"], data["salary_range_max"]) == (40000, 50000)
+
+
+def test_blank_salaries_become_none():
+    data, errors = parse_application_form(_form(salary_range_min="", salary_range_max=""))
+
+    assert errors == []
+    assert data["salary_range_min"] is None
+    assert data["salary_range_max"] is None
+
+
+@pytest.mark.parametrize("field, value, message", [
+    ("company", "  ", "Company is required"),
+    ("role", "", "Role is required"),
+    ("source", "linkedin_dm", "valid source"),
+    ("date_applied", "yesterday", "Date applied"),
+    ("salary_range_min", "40k", "whole number"),
+])
+def test_invalid_field_reports_an_error(field, value, message):
+    _, errors = parse_application_form(_form(**{field: value}))
+
+    assert any(message in e for e in errors)
+
+
+def test_min_salary_above_max_is_an_error():
+    _, errors = parse_application_form(_form(salary_range_min="60000", salary_range_max="50000"))
+
+    assert any("cannot be higher" in e for e in errors)

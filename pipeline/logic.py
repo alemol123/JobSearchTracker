@@ -1,5 +1,9 @@
 """Pipeline business rules. Pure functions: no Flask, no SQL."""
 
+from datetime import date
+
+SOURCES = ("referral", "job_board", "cold_apply", "other")
+
 # Active stages in the order an application normally moves through them.
 STAGE_ORDER = {
     "applied": 1,
@@ -85,3 +89,53 @@ def conversion_rates_by_source(applications):
             })
         result[source] = rows
     return result
+
+
+def parse_application_form(form):
+    """Turn the raw strings from the new-application form into typed values.
+
+    Returns (data, errors). If errors is non-empty, data must not be saved.
+    """
+    errors = []
+
+    company = form.get("company", "").strip()
+    role = form.get("role", "").strip()
+    source = form.get("source", "")
+    if not company:
+        errors.append("Company is required.")
+    if not role:
+        errors.append("Role is required.")
+    if source not in SOURCES:
+        errors.append("Choose a valid source.")
+
+    try:
+        date_applied = date.fromisoformat(form.get("date_applied", ""))
+    except ValueError:
+        date_applied = None
+        errors.append("Date applied must be a date (YYYY-MM-DD).")
+
+    salary_min = _parse_salary(form.get("salary_range_min", ""), "Minimum salary", errors)
+    salary_max = _parse_salary(form.get("salary_range_max", ""), "Maximum salary", errors)
+    if salary_min is not None and salary_max is not None and salary_min > salary_max:
+        errors.append("Minimum salary cannot be higher than maximum salary.")
+
+    data = {
+        "company": company,
+        "role": role,
+        "source": source,
+        "date_applied": date_applied,
+        "salary_range_min": salary_min,
+        "salary_range_max": salary_max,
+    }
+    return data, errors
+
+
+def _parse_salary(text, label, errors):
+    """Blank means 'not given' (None); anything else must be a whole number."""
+    text = text.strip()
+    if not text:
+        return None
+    if not text.isdigit():
+        errors.append(f"{label} must be a whole number.")
+        return None
+    return int(text)
