@@ -7,6 +7,8 @@ my_skills:  {skill_id: proficiency_level 1-5}
 active_ids: set of application IDs whose status is 'active'
 """
 
+MAX_PROFICIENCY = 5
+
 
 def demand_counts(tags, active_ids):
     """{skill_id: number of active applications that require it}."""
@@ -31,3 +33,27 @@ def rank_by_demand(tags, my_skills, active_ids):
     ]
     ranking.sort(key=lambda r: (-r["demand"], r["skill_id"]))
     return ranking
+
+
+def priority_scores(tags, my_skills, active_ids):
+    """Which demanded skills to work on first: score = demand x proficiency gap.
+
+    gap = 5 - my proficiency (a skill I don't have counts as 0, so gap 5).
+    Skills I'm already at 5 in have nothing to improve and are left out.
+    Sorted by score, then demand (both highest first), then skill_id.
+    """
+    result = []
+    for skill_id, demand in demand_counts(tags, active_ids).items():
+        proficiency = my_skills.get(skill_id, 0)
+        gap = MAX_PROFICIENCY - proficiency
+        if gap == 0:
+            continue
+        result.append({
+            "skill_id": skill_id,
+            "demand": demand,
+            "proficiency": proficiency,
+            "gap": gap,
+            "score": demand * gap,
+        })
+    result.sort(key=lambda r: (-r["score"], -r["demand"], r["skill_id"]))
+    return result

@@ -1,4 +1,4 @@
-from skills.logic import demand_counts, missing_skills, rank_by_demand
+from skills.logic import demand_counts, missing_skills, priority_scores, rank_by_demand
 
 # Skill IDs used in these tests
 PYTHON, SQL, DOCKER, REACT = 1, 2, 3, 4
@@ -86,3 +86,56 @@ def test_ranking_changes_when_an_application_leaves_the_pipeline():
     assert before[0] == {"skill_id": PYTHON, "demand": 3}
     assert {"skill_id": DOCKER, "demand": 2} in before
     assert DOCKER not in [r["skill_id"] for r in after]
+
+
+# ---------- priority_scores ----------
+
+def _scores_by_skill(result):
+    return {r["skill_id"]: r for r in result}
+
+
+def test_missing_skill_has_full_gap():
+    result = _scores_by_skill(priority_scores(TAGS, my_skills={}, active_ids={10, 11, 12}))
+
+    python = result[PYTHON]
+    assert (python["proficiency"], python["gap"], python["demand"], python["score"]) == (0, 5, 3, 15)
+
+
+def test_low_proficiency_skill_gets_partial_gap():
+    result = _scores_by_skill(priority_scores(TAGS, my_skills={SQL: 2}, active_ids={10, 11, 12}))
+
+    assert (result[SQL]["gap"], result[SQL]["score"]) == (3, 3)
+
+
+def test_scores_combine_demand_and_gap_highest_first():
+    # Python: demand 3, I'm at 4 -> gap 1 -> 3
+    # Docker: demand 2, missing  -> gap 5 -> 10
+    # SQL:    demand 1, missing  -> gap 5 -> 5
+    result = priority_scores(TAGS, my_skills={PYTHON: 4}, active_ids={10, 11, 12})
+
+    assert [(r["skill_id"], r["score"]) for r in result] == [(DOCKER, 10), (SQL, 5), (PYTHON, 3)]
+
+
+def test_skill_at_max_proficiency_is_left_out():
+    result = priority_scores(TAGS, my_skills={PYTHON: 5}, active_ids={10, 11, 12})
+
+    assert PYTHON not in [r["skill_id"] for r in result]
+
+
+def test_skills_from_closed_applications_get_no_score():
+    result = priority_scores(TAGS, my_skills={}, active_ids={10, 11, 12})
+
+    assert REACT not in [r["skill_id"] for r in result]
+
+
+def test_equal_scores_put_higher_demand_first():
+    # Skill A: demand 2, level 3 -> gap 2 -> 4.  Skill B: demand 4, level 4 -> gap 1 -> 4
+    tags = [(1, SQL), (2, SQL), (1, DOCKER), (2, DOCKER), (3, DOCKER), (4, DOCKER)]
+
+    result = priority_scores(tags, my_skills={SQL: 3, DOCKER: 4}, active_ids={1, 2, 3, 4})
+
+    assert [(r["skill_id"], r["score"]) for r in result] == [(DOCKER, 4), (SQL, 4)]
+
+
+def test_priority_scores_with_nothing_tagged():
+    assert priority_scores([], my_skills={PYTHON: 3}, active_ids={10}) == []
