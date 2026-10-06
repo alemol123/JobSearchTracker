@@ -149,3 +149,8 @@ def test_skill_names_include_archived_skills(conn):
     repo.archive_skill(conn, perl)
 
     assert repo.get_skill_names(conn) == {python: "Python", perl: "Perl"}
+
+
+def test_set_proficiency_on_missing_skill_raises_lookup_error(conn):
+    with pytest.raises(LookupError):
+        repo.set_proficiency(conn, 999, 3)

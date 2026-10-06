@@ -57,3 +57,28 @@ def priority_scores(tags, my_skills, active_ids):
         })
     result.sort(key=lambda r: (-r["score"], -r["demand"], r["skill_id"]))
     return result
+
+
+MAX_SKILL_NAME_LENGTH = 50
+
+
+def parse_skill_form(form):
+    """Clean the add-skill form. Returns (data, errors); blank category becomes None."""
+    name = form.get("name", "").strip()
+    category = form.get("category", "").strip() or None
+    errors = []
+    if not name:
+        errors.append("Skill name is required.")
+    elif len(name) > MAX_SKILL_NAME_LENGTH:
+        errors.append(f"Skill name must be at most {MAX_SKILL_NAME_LENGTH} characters.")
+    return {"name": name, "category": category}, errors
+
+
+def parse_proficiency(text):
+    """Returns (level, error). Blank = I don't have this skill -> (None, None)."""
+    text = text.strip()
+    if not text:
+        return None, None
+    if not text.isdigit() or not 1 <= int(text) <= MAX_PROFICIENCY:
+        return None, f"Proficiency must be a whole number between 1 and {MAX_PROFICIENCY}."
+    return int(text), None

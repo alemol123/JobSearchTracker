@@ -45,6 +45,8 @@ def get_skill_names(conn):
 
 def set_proficiency(conn, skill_id, level):
     """Insert or update my level for a skill (1-5; the table's CHECK enforces it)."""
+    if conn.execute("SELECT 1 FROM skills WHERE id = ?", (skill_id,)).fetchone() is None:
+        raise LookupError(f"Skill {skill_id} not found")
     conn.execute(
         """INSERT INTO my_skills (skill_id, proficiency_level) VALUES (?, ?)
            ON CONFLICT (skill_id) DO UPDATE SET proficiency_level = excluded.proficiency_level""",

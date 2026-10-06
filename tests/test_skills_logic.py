@@ -1,4 +1,13 @@
-from skills.logic import demand_counts, missing_skills, priority_scores, rank_by_demand
+import pytest
+
+from skills.logic import (
+    demand_counts,
+    missing_skills,
+    parse_proficiency,
+    parse_skill_form,
+    priority_scores,
+    rank_by_demand,
+)
 
 # Skill IDs used in these tests
 PYTHON, SQL, DOCKER, REACT = 1, 2, 3, 4
@@ -139,3 +148,43 @@ def test_equal_scores_put_higher_demand_first():
 
 def test_priority_scores_with_nothing_tagged():
     assert priority_scores([], my_skills={PYTHON: 3}, active_ids={10}) == []
+
+
+# ---------- parse_skill_form ----------
+
+def test_skill_form_strips_spaces_and_blank_category_becomes_none():
+    data, errors = parse_skill_form({"name": "  Docker ", "category": "  "})
+
+    assert errors == []
+    assert data == {"name": "Docker", "category": None}
+
+
+def test_skill_form_requires_a_name():
+    _, errors = parse_skill_form({"name": "   ", "category": "tool"})
+
+    assert errors == ["Skill name is required."]
+
+
+def test_skill_form_rejects_very_long_names():
+    _, errors = parse_skill_form({"name": "x" * 51, "category": ""})
+
+    assert any("50 characters" in e for e in errors)
+
+
+# ---------- parse_proficiency ----------
+
+@pytest.mark.parametrize("text, level", [("1", 1), ("5", 5), (" 3 ", 3)])
+def test_valid_proficiency_levels(text, level):
+    assert parse_proficiency(text) == (level, None)
+
+
+@pytest.mark.parametrize("text", ["0", "6", "abc", "2.5"])
+def test_invalid_proficiency_levels(text):
+    level, error = parse_proficiency(text)
+
+    assert level is None
+    assert "between 1 and 5" in error
+
+
+def test_blank_proficiency_means_i_do_not_have_the_skill():
+    assert parse_proficiency("") == (None, None)

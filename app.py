@@ -3,6 +3,7 @@ from flask import Flask, redirect, url_for
 
 from db import close_db, db_path, init_db
 from pipeline.routes import bp as pipeline_bp
+from skills.routes import bp as skills_bp
 
 
 def create_app():
@@ -18,6 +19,7 @@ def create_app():
     app.teardown_appcontext(close_db)
 
     app.register_blueprint(pipeline_bp)
+    app.register_blueprint(skills_bp)
 
     @app.route("/")
     def index():

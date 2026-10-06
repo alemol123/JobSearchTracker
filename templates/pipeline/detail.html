@@ -11,6 +11,8 @@
 <p>Salary range: {{ application.salary_range_min or "?" }} – {{ application.salary_range_max or "?" }}</p>
 {% endif %}
 
+<p><a href="{{ url_for('skills.application_skills', app_id=application.id) }}">Required skills for this application →</a></p>
+
 <h3>Move to stage</h3>
 {% if next_stages %}
 <form method="post" action="{{ url_for('pipeline.change_stage', app_id=application.id) }}">

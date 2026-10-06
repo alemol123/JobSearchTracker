@@ -10,3 +10,4 @@ input, select, button { font: inherit; padding: 4px 6px; }
 .flash.error, .errors { background: #fdeaea; border-left: 4px solid #c33; padding: 8px 8px 8px 24px; }
 .badge.stale { background: #f5c542; padding: 1px 6px; border-radius: 4px; font-size: 0.85em; }
 .muted { color: #777; }
+form.inline { display: inline; margin-left: 8px; }

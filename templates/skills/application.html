@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Skills for {{ application.company }} · Job Search Tracker{% endblock %}
+{% block content %}
+<h2>Skills for {{ application.company }} — {{ application.role }}</h2>
+<p><a href="{{ url_for('pipeline.detail', app_id=application.id) }}">← Back to application</a></p>
+
+<h3>Required skills</h3>
+{% if tagged %}
+<ul>
+  {% for s in tagged %}
+  <li>
+    {{ s.name }}{% if s.archived %} <span class="muted">(archived)</span>{% endif %}
+    <form method="post" action="{{ url_for('skills.untag', app_id=application.id) }}" class="inline">
+      <input type="hidden" name="skill_id" value="{{ s.id }}">
+      <button type="submit">Remove</button>
+    </form>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<p>No skills tagged yet.</p>
+{% endif %}
+
+<h3>Add a skill</h3>
+{% if available %}
+<form method="post" action="{{ url_for('skills.tag', app_id=application.id) }}">
+  <select name="skill_id">
+    {% for s in available %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}
+  </select>
+  <button type="submit">Add</button>
+</form>
+{% else %}
+<p class="muted">No more skills to add. <a href="{{ url_for('skills.list_view') }}">Create one on the Skills page</a>.</p>
+{% endif %}
+{% endblock %}
