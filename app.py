@@ -6,6 +6,10 @@ from pipeline.routes import bp as pipeline_bp
 from skills.routes import bp as skills_bp
 
 
+def get_port():
+    return int(os.environ.get("PORT", "8000"))
+
+
 def create_app():
     app = Flask(__name__)
     app.config["DATA_DIR"] = os.environ.get("DATA_DIR", "./data")
@@ -29,5 +33,4 @@ def create_app():
 
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", "8000"))
-    create_app().run(host="0.0.0.0", port=port)
+    create_app().run(host="0.0.0.0", port=get_port())
