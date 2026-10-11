@@ -1,39 +1,55 @@
 {% extends "base.html" %}
 {% block title %}Skill gap · Job Search Tracker{% endblock %}
 {% block content %}
-<h2>Skill gap</h2>
-<p class="muted">Only active applications count. Rejected or withdrawn applications drop out automatically.</p>
+<div class="page-header">
+  <div>
+    <h1>Skill gap</h1>
+    <p class="muted">Only active applications count. Rejected or withdrawn ones drop out automatically.</p>
+  </div>
+</div>
 
-<h3>What to work on first</h3>
-{% if priorities %}
-<table>
-  <thead><tr><th>#</th><th>Skill</th><th>Wanted by</th><th>My level</th><th>Gap</th><th>Score</th></tr></thead>
-  <tbody>
-    {% for p in priorities %}
-    <tr>
-      <td>{{ loop.index }}</td>
-      <td>{{ names[p.skill_id] }}</td>
-      <td>{{ p.demand }} application{{ "s" if p.demand != 1 }}</td>
-      <td>{{ p.proficiency or "—" }}</td>
-      <td>{{ p.gap }}</td>
-      <td><strong>{{ p.score }}</strong></td>
-    </tr>
+<section class="card">
+  <h2>What to work on first</h2>
+  {% if priorities %}
+  {% set top_score = priorities[0].score %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>#</th><th>Skill</th><th>Wanted by</th><th>My level</th><th>Gap</th><th>Score</th></tr></thead>
+      <tbody>
+        {% for p in priorities %}
+        <tr>
+          <td class="muted">{{ loop.index }}</td>
+          <td><strong>{{ names[p.skill_id] }}</strong></td>
+          <td>{{ p.demand }} application{{ "s" if p.demand != 1 }}</td>
+          <td>{{ p.proficiency or "—" }}</td>
+          <td>{{ p.gap }}</td>
+          <td>
+            <div class="bar-cell">
+              <div class="bar"><span style="width: {{ (p.score / top_score * 100)|round|int }}%"></span></div>
+              <strong>{{ p.score }}</strong>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="muted">Score = applications wanting the skill × (5 − my level). A skill I don't have counts as level 0.</p>
+  {% else %}
+  <p>Nothing to show yet. Tag skills on your active applications.</p>
+  {% endif %}
+</section>
+
+<section class="card">
+  <h2>Missing skills by demand</h2>
+  {% if missing %}
+  <ul class="chips">
+    {% for m in missing %}
+    <li style="padding-right: 4px">{{ names[m.skill_id] }} <span class="badge">{{ m.demand }}</span></li>
     {% endfor %}
-  </tbody>
-</table>
-<p class="muted">Score = applications wanting the skill × (5 − my level). A skill I don't have counts as level 0.</p>
-{% else %}
-<p>Nothing to show yet. Tag skills on your active applications.</p>
-{% endif %}
-
-<h3>Missing skills by demand</h3>
-{% if missing %}
-<ol>
-  {% for m in missing %}
-  <li>{{ names[m.skill_id] }} — wanted by {{ m.demand }}</li>
-  {% endfor %}
-</ol>
-{% else %}
-<p class="muted">No missing skills: you have every skill your active applications ask for.</p>
-{% endif %}
+  </ul>
+  {% else %}
+  <p class="muted">No missing skills: you have every skill your active applications ask for.</p>
+  {% endif %}
+</section>
 {% endblock %}

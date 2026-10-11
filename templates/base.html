@@ -7,18 +7,23 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-  <header>
-    <h1><a href="{{ url_for('pipeline.list_view') }}">Job Search Tracker</a></h1>
-    <nav>
-      <a href="{{ url_for('pipeline.list_view') }}">Applications</a>
-      <a href="{{ url_for('pipeline.new') }}">New application</a>
-      <a href="{{ url_for('skills.list_view') }}">Skills</a>
-      <a href="{{ url_for('skills.gap') }}">Skill gap</a>
-    </nav>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="{{ url_for('pipeline.list_view') }}">Job Search Tracker</a>
+      <nav>
+        {# request.blueprint is "pipeline" or "skills": highlight the section we're in #}
+        <a href="{{ url_for('pipeline.list_view') }}"
+           class="{{ 'active' if request.blueprint == 'pipeline' or request.endpoint == 'skills.application_skills' else '' }}">Applications</a>
+        <a href="{{ url_for('skills.list_view') }}"
+           class="{{ 'active' if request.endpoint == 'skills.list_view' else '' }}">Skills</a>
+        <a href="{{ url_for('skills.gap') }}"
+           class="{{ 'active' if request.endpoint == 'skills.gap' else '' }}">Skill gap</a>
+      </nav>
+    </div>
   </header>
-  <main>
+  <main class="container">
     {% for category, message in get_flashed_messages(with_categories=true) %}
-      <p class="flash {{ category }}">{{ message }}</p>
+      <div class="alert {{ category }}">{{ message }}</div>
     {% endfor %}
     {% block content %}{% endblock %}
   </main>

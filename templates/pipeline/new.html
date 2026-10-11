@@ -1,27 +1,35 @@
 {% extends "base.html" %}
 {% block title %}New application · Job Search Tracker{% endblock %}
 {% block content %}
-<h2>New application</h2>
+<div class="page-header">
+  <div>
+    <h1>New application</h1>
+    <p class="muted">It starts in the "applied" stage on the date you applied.</p>
+  </div>
+  <a class="btn btn-outline" href="{{ url_for('pipeline.list_view') }}">Cancel</a>
+</div>
 
-{% if errors %}
-<ul class="errors">
-  {% for e in errors %}<li>{{ e }}</li>{% endfor %}
-</ul>
-{% endif %}
+<section class="card">
+  {% if errors %}
+  <div class="alert error">
+    <ul>{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>
+  </div>
+  {% endif %}
 
-<form method="post" action="{{ url_for('pipeline.new') }}">
-  <label>Company <input name="company" value="{{ form.company or '' }}" required></label>
-  <label>Role <input name="role" value="{{ form.role or '' }}" required></label>
-  <label>Source
-    <select name="source">
-      {% for s in sources %}
-      <option value="{{ s }}" {% if form.source == s %}selected{% endif %}>{{ s|replace("_", " ") }}</option>
-      {% endfor %}
-    </select>
-  </label>
-  <label>Date applied <input type="date" name="date_applied" value="{{ form.date_applied or '' }}" required></label>
-  <label>Salary min (optional) <input name="salary_range_min" inputmode="numeric" value="{{ form.salary_range_min or '' }}"></label>
-  <label>Salary max (optional) <input name="salary_range_max" inputmode="numeric" value="{{ form.salary_range_max or '' }}"></label>
-  <button type="submit">Add application</button>
-</form>
+  <form method="post" action="{{ url_for('pipeline.new') }}" class="form-grid">
+    <label>Company <input name="company" value="{{ form.company or '' }}" required></label>
+    <label>Role <input name="role" value="{{ form.role or '' }}" required></label>
+    <label>Source
+      <select name="source">
+        {% for s in sources %}
+        <option value="{{ s }}" {% if form.source == s %}selected{% endif %}>{{ s|replace("_", " ") }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Date applied <input type="date" name="date_applied" value="{{ form.date_applied or '' }}" required></label>
+    <label>Salary min (optional) <input name="salary_range_min" inputmode="numeric" value="{{ form.salary_range_min or '' }}"></label>
+    <label>Salary max (optional) <input name="salary_range_max" inputmode="numeric" value="{{ form.salary_range_max or '' }}"></label>
+    <div class="full"><button type="submit">Add application</button></div>
+  </form>
+</section>
 {% endblock %}

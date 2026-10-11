@@ -57,7 +57,8 @@ def detail(app_id):
     _add_stage_age(application, date.today())
     return render_template("pipeline/detail.html", application=application,
                            history=repo.get_stage_history(conn, app_id),
-                           next_stages=logic.allowed_next_stages(application["current_stage"]))
+                           next_stages=logic.allowed_next_stages(application["current_stage"]),
+                           stage_order=logic.STAGE_ORDER)
 
 
 @bp.post("/<int:app_id>/stage")

@@ -1,51 +1,71 @@
 {% extends "base.html" %}
 {% block title %}Applications · Job Search Tracker{% endblock %}
 {% block content %}
-<h2>Applications</h2>
+<div class="page-header">
+  <div>
+    <h1>Applications</h1>
+    <p class="muted">Every job you've applied to and where it stands.</p>
+  </div>
+  <a class="btn" href="{{ url_for('pipeline.new') }}">+ New application</a>
+</div>
 
-{% if applications %}
-<table>
-  <thead>
-    <tr><th>Company</th><th>Role</th><th>Source</th><th>Stage</th><th>Days in stage</th><th>Status</th></tr>
-  </thead>
-  <tbody>
-    {% for a in applications %}
-    <tr>
-      <td><a href="{{ url_for('pipeline.detail', app_id=a.id) }}">{{ a.company }}</a></td>
-      <td>{{ a.role }}</td>
-      <td>{{ a.source|replace("_", " ") }}</td>
-      <td>{{ a.current_stage|replace("_", " ") }}</td>
-      <td>
-        {{ a.days_in_stage }}
-        {% if a.stale %}<span class="badge stale">stale</span>{% endif %}
-      </td>
-      <td>{{ a.status }}</td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
-<p class="muted">"Stale" = active with no stage change for more than {{ stale_days }} days.</p>
-{% else %}
-<p>No applications yet. <a href="{{ url_for('pipeline.new') }}">Add your first one</a>.</p>
-{% endif %}
+<section class="card">
+  {% if applications %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Company</th><th>Role</th><th>Source</th><th>Stage</th><th>Days in stage</th><th>Status</th></tr>
+      </thead>
+      <tbody>
+        {% for a in applications %}
+        <tr class="{{ 'row-stale' if a.stale else '' }}">
+          <td><a href="{{ url_for('pipeline.detail', app_id=a.id) }}">{{ a.company }}</a></td>
+          <td>{{ a.role }}</td>
+          <td class="muted">{{ a.source|replace("_", " ") }}</td>
+          <td><span class="badge stage-{{ a.current_stage }}">{{ a.current_stage|replace("_", " ") }}</span></td>
+          <td>
+            {{ a.days_in_stage }}
+            {% if a.stale %}<span class="badge badge-warning">stale</span>{% endif %}
+          </td>
+          <td><span class="badge badge-outline">{{ a.status }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="muted">"Stale" = active with no stage change for more than {{ stale_days }} days.</p>
+  {% else %}
+  <p>No applications yet. <a href="{{ url_for('pipeline.new') }}">Add your first one</a>.</p>
+  {% endif %}
+</section>
 
 {% if rates %}
 <h2>Conversion by source</h2>
-{% for source, rows in rates.items() %}
-<h3>{{ source|replace("_", " ") }}</h3>
-<table>
-  <thead><tr><th>Step</th><th>Reached</th><th>Moved on</th><th>Rate</th></tr></thead>
-  <tbody>
-    {% for r in rows %}
-    <tr>
-      <td>{{ r.from_stage|replace("_", " ") }} → {{ r.to_stage|replace("_", " ") }}</td>
-      <td>{{ r.reached }}</td>
-      <td>{{ r.advanced }}</td>
-      <td>{% if r.rate is none %}—{% else %}{{ (r.rate * 100)|round|int }}%{% endif %}</td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
-{% endfor %}
+<div class="card-grid">
+  {% for source, rows in rates.items() %}
+  <section class="card">
+    <h2>{{ source|replace("_", " ")|capitalize }}</h2>
+    <table>
+      <thead><tr><th>Step</th><th>Moved on</th><th>Rate</th></tr></thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td>{{ r.from_stage|replace("_", " ") }} → {{ r.to_stage|replace("_", " ") }}</td>
+          <td class="muted">{{ r.advanced }} / {{ r.reached }}</td>
+          <td>
+            {% if r.rate is none %}<span class="muted">—</span>{% else %}
+            <div class="bar-cell">
+              <div class="bar"><span style="width: {{ (r.rate * 100)|round|int }}%"></span></div>
+              {{ (r.rate * 100)|round|int }}%
+            </div>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+  {% endfor %}
+</div>
 {% endif %}
 {% endblock %}

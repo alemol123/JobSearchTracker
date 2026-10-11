@@ -1,52 +1,66 @@
 {% extends "base.html" %}
 {% block title %}Skills · Job Search Tracker{% endblock %}
 {% block content %}
-<h2>Skills</h2>
+<div class="page-header">
+  <div>
+    <h1>Skills</h1>
+    <p class="muted">Skills your applications ask for, and your own level in each.</p>
+  </div>
+</div>
 
-<form method="post" action="{{ url_for('skills.add') }}">
-  <label>Name <input name="name" required maxlength="50"></label>
-  <label>Category (optional) <input name="category" placeholder="language, tool, soft skill…"></label>
-  <button type="submit">Add skill</button>
-</form>
+<section class="card">
+  <h2>Add a skill</h2>
+  <form method="post" action="{{ url_for('skills.add') }}" class="form-row">
+    <label>Name <input name="name" required maxlength="50"></label>
+    <label>Category (optional) <input name="category" placeholder="language, tool, soft skill…"></label>
+    <button type="submit">Add skill</button>
+  </form>
+</section>
 
-{% if skills %}
-<table>
-  <thead><tr><th>Skill</th><th>Category</th><th>My level (1–{{ max_level }})</th><th></th></tr></thead>
-  <tbody>
-    {% for s in skills %}
-    <tr>
-      <td>{{ s.name }}</td>
-      <td>{{ s.category or "—" }}</td>
-      <td>
-        <form method="post" action="{{ url_for('skills.set_proficiency', skill_id=s.id) }}">
-          <select name="level">
-            <option value="" {% if s.proficiency_level is none %}selected{% endif %}>I don't have it</option>
-            {% for level in range(1, max_level + 1) %}
-            <option value="{{ level }}" {% if s.proficiency_level == level %}selected{% endif %}>{{ level }}</option>
-            {% endfor %}
-          </select>
-          <button type="submit">Save</button>
-        </form>
-      </td>
-      <td>
-        <form method="post" action="{{ url_for('skills.archive', skill_id=s.id) }}">
-          <button type="submit">Archive</button>
-        </form>
-      </td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
-{% else %}
-<p>No skills yet. Add the skills your job applications ask for.</p>
-{% endif %}
+<section class="card">
+  {% if skills %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Skill</th><th>Category</th><th>My level (1–{{ max_level }})</th><th></th></tr></thead>
+      <tbody>
+        {% for s in skills %}
+        <tr>
+          <td><strong>{{ s.name }}</strong></td>
+          <td>{% if s.category %}<span class="badge badge-outline">{{ s.category }}</span>{% else %}<span class="muted">—</span>{% endif %}</td>
+          <td>
+            <form method="post" action="{{ url_for('skills.set_proficiency', skill_id=s.id) }}" class="inline">
+              <select name="level">
+                <option value="" {% if s.proficiency_level is none %}selected{% endif %}>I don't have it</option>
+                {% for level in range(1, max_level + 1) %}
+                <option value="{{ level }}" {% if s.proficiency_level == level %}selected{% endif %}>{{ level }}</option>
+                {% endfor %}
+              </select>
+              <button type="submit" class="btn-outline btn-sm">Save</button>
+            </form>
+          </td>
+          <td>
+            <form method="post" action="{{ url_for('skills.archive', skill_id=s.id) }}" class="inline">
+              <button type="submit" class="btn-ghost-danger btn-sm">Archive</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p>No skills yet. Add the skills your job applications ask for.</p>
+  {% endif %}
+</section>
 
 {% if archived %}
-<h3>Archived</h3>
-<p class="muted">Hidden from new tagging; kept on applications that already had them.
-   Add the same name again to restore one.</p>
-<ul>
-  {% for s in archived %}<li>{{ s.name }}</li>{% endfor %}
-</ul>
+<section class="card">
+  <h2>Archived</h2>
+  <p class="muted">Hidden from new tagging; kept on applications that already had them.
+     Add the same name again to restore one.</p>
+  <ul class="chips">
+    {% for s in archived %}<li style="padding-right: 12px">{{ s.name }}</li>{% endfor %}
+  </ul>
+</section>
 {% endif %}
 {% endblock %}
