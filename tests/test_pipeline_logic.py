@@ -45,11 +45,22 @@ def test_any_active_stage_can_move_to_terminal(current, terminal):
     validate_transition(current, terminal)
 
 
-@pytest.mark.parametrize("current", ["rejected", "withdrawn"])
-@pytest.mark.parametrize("new", ["applied", "offer", "rejected", "withdrawn"])
+@pytest.mark.parametrize("current", ["rejected", "withdrawn", "accepted"])
+@pytest.mark.parametrize("new", ["applied", "offer", "rejected", "withdrawn", "accepted"])
 def test_cannot_move_out_of_terminal_stage(current, new):
     with pytest.raises(InvalidTransition, match="closed"):
         validate_transition(current, new)
+
+
+def test_offer_can_be_accepted():
+    validate_transition("offer", "accepted")
+
+
+@pytest.mark.parametrize("current", ["applied", "phone_screen", "technical_assessment",
+                                     "interview", "final_round"])
+def test_only_an_offer_can_be_accepted(current):
+    with pytest.raises(InvalidTransition, match="Only an offer"):
+        validate_transition(current, "accepted")
 
 
 def test_unknown_stage_is_rejected():
@@ -64,7 +75,7 @@ def test_active_stages_keep_status_active(stage):
     assert status_for_stage(stage) == "active"
 
 
-@pytest.mark.parametrize("stage", ["rejected", "withdrawn"])
+@pytest.mark.parametrize("stage", ["rejected", "withdrawn", "accepted"])
 def test_terminal_stage_sets_matching_status(stage):
     assert status_for_stage(stage) == stage
 
@@ -96,7 +107,7 @@ def test_recent_active_application_is_not_stale():
     assert is_stale("active", date(2026, 10, 18), TODAY, threshold_days=14) is False
 
 
-@pytest.mark.parametrize("status", ["rejected", "withdrawn"])
+@pytest.mark.parametrize("status", ["rejected", "withdrawn", "accepted"])
 def test_closed_application_is_never_stale(status):
     assert is_stale(status, date(2026, 1, 1), TODAY, threshold_days=14) is False
 
@@ -143,6 +154,14 @@ def test_conversion_rates_are_grouped_by_source():
     assert set(result) == {"referral", "job_board"}
     assert _rate(result["referral"], "applied")["rate"] == 1.0
     assert _rate(result["job_board"], "applied")["rate"] == 0.0
+
+
+def test_accepted_offer_counts_as_reaching_offer():
+    applications = [{"source": "referral", "stages": ["applied", "offer", "accepted"]}]
+
+    rows = conversion_rates_by_source(applications)["referral"]
+
+    assert _rate(rows, "final_round")["rate"] == 1.0
 
 
 def test_terminal_stages_do_not_count_as_progress():
@@ -217,9 +236,10 @@ def test_next_stages_from_applied_are_all_later_stages_plus_terminal():
     ]
 
 
-def test_next_stages_from_offer_are_only_terminal():
-    assert allowed_next_stages("offer") == ["rejected", "withdrawn"]
+def test_next_stages_from_offer_are_accept_or_close():
+    assert allowed_next_stages("offer") == ["accepted", "rejected", "withdrawn"]
 
 
-def test_closed_application_has_no_next_stages():
-    assert allowed_next_stages("rejected") == []
+@pytest.mark.parametrize("stage", ["rejected", "withdrawn", "accepted"])
+def test_closed_application_has_no_next_stages(stage):
+    assert allowed_next_stages(stage) == []

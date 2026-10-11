@@ -127,6 +127,7 @@ td a:hover { text-decoration: underline; }
 .stage-offer                { background: #dcfce7; color: #166534; }
 .stage-rejected             { background: #fee2e2; color: #991b1b; }
 .stage-withdrawn            { background: #e4e4e7; color: #3f3f46; }
+.stage-accepted             { background: #15803d; color: #f0fdf4; }
 
 /* ---------- alerts (flash messages and form errors) ---------- */
 .alert { border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 14px; margin-bottom: 16px; font-size: 0.9rem; }

@@ -12,11 +12,11 @@ CREATE TABLE IF NOT EXISTS applications (
     current_stage    TEXT    NOT NULL DEFAULT 'applied'
                      CHECK (current_stage IN ('applied', 'phone_screen', 'technical_assessment',
                                               'interview', 'final_round', 'offer',
-                                              'rejected', 'withdrawn')),
+                                              'rejected', 'withdrawn', 'accepted')),
     salary_range_min INTEGER,
     salary_range_max INTEGER,
     status           TEXT    NOT NULL DEFAULT 'active'
-                     CHECK (status IN ('active', 'rejected', 'withdrawn')),
+                     CHECK (status IN ('active', 'rejected', 'withdrawn', 'accepted')),
     CHECK (salary_range_min IS NULL OR salary_range_max IS NULL
            OR salary_range_min <= salary_range_max)
 );
@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS stage_history (
     stage          TEXT    NOT NULL
                    CHECK (stage IN ('applied', 'phone_screen', 'technical_assessment',
                                     'interview', 'final_round', 'offer',
-                                    'rejected', 'withdrawn')),
+                                    'rejected', 'withdrawn', 'accepted')),
     entered_at     TEXT    NOT NULL                 -- ISO datetime, YYYY-MM-DDTHH:MM:SS
 );
 

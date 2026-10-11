@@ -44,12 +44,16 @@
     <form method="post" action="{{ url_for('pipeline.change_stage', app_id=application.id) }}" class="form-row">
       <label>New stage
         <select name="stage">
-          {% for s in next_stages %}<option value="{{ s }}">{{ s|replace("_", " ") }}</option>{% endfor %}
+          {# Closing states get a hint so their meaning is clear #}
+          {% set hints = {"accepted": " — I took the offer",
+                          "withdrawn": " — I pulled out / declined",
+                          "rejected": " — the company said no"} %}
+          {% for s in next_stages %}<option value="{{ s }}">{{ s|replace("_", " ") }}{{ hints.get(s, "") }}</option>{% endfor %}
         </select>
       </label>
       <button type="submit">Move</button>
     </form>
-    <p class="muted">Only allowed moves are listed: forward (skips are fine), rejected or withdrawn.</p>
+    <p class="muted">Only allowed moves are listed: forward (skips are fine), rejected or withdrawn at any time, and accepted once there's an offer.</p>
     {% else %}
     <p class="muted">This application is closed and can't move any more.</p>
     {% endif %}

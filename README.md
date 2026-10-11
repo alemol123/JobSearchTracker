@@ -6,7 +6,7 @@ A personal web app for tracking job applications through a hiring pipeline and f
 
 **Application Pipeline** (`/applications`)
 - Add applications with company, role, source (referral, job board, cold apply, other), date applied and an optional salary range.
-- Move an application through the stages applied → phone screen → technical assessment → interview → final round → offer. Stages can be skipped forward but never moved backwards; rejected and withdrawn can be reached from any stage and close the application.
+- Move an application through the stages applied → phone screen → technical assessment → interview → final round → offer. Stages can be skipped forward but never moved backwards; rejected and withdrawn can be reached from any stage, and an offer can be accepted. All three close the application.
 - Every stage change is recorded with a timestamp, and each application shows how many days it has been in its current stage.
 - Applications with no movement for more than `STALE_DAYS` days are flagged as stale.
 - Conversion rates between stages, grouped by source.
@@ -14,7 +14,7 @@ A personal web app for tracking job applications through a hiring pipeline and f
 **Skill Gap Tracker** (`/skills`)
 - Keep a list of skills and rate my own level from 1 to 5.
 - Tag the skills each application requires.
-- See which skills are missing, ranked by how many active applications want them, and a priority score (`applications wanting it × (5 − my level)`) for what to learn first. Rejected and withdrawn applications drop out of the ranking automatically.
+- See which skills are missing, ranked by how many active applications want them, and a priority score (`applications wanting it × (5 − my level)`) for what to learn first. Rejected, withdrawn and accepted applications drop out of the ranking automatically.
 - Archiving a skill hides it from new tagging but keeps it on applications that already had it (soft delete).
 
 ## Run locally
@@ -47,13 +47,13 @@ With the virtual environment active:
 pytest --cov=pipeline --cov=skills --cov-report=term-missing
 ```
 
-Result (2026-10-07, 135 tests):
+Result (2026-10-11, 154 tests):
 
 ```
 Name                     Stmts   Miss  Cover   Missing
 ------------------------------------------------------
 pipeline/__init__.py         0      0   100%
-pipeline/logic.py           80      0   100%
+pipeline/logic.py           84      0   100%
 pipeline/repository.py      42      0   100%
 pipeline/routes.py          49      0   100%
 skills/__init__.py           0      0   100%
@@ -61,8 +61,8 @@ skills/logic.py             41      0   100%
 skills/repository.py        52      0   100%
 skills/routes.py            75      0   100%
 ------------------------------------------------------
-TOTAL                      339      0   100%
-135 passed
+TOTAL                      343      0   100%
+154 passed
 ```
 
 What the tests cover:
@@ -138,10 +138,10 @@ erDiagram
         TEXT role
         TEXT source "referral | job_board | cold_apply | other"
         TEXT date_applied "YYYY-MM-DD"
-        TEXT current_stage "applied ... offer, rejected, withdrawn"
+        TEXT current_stage "applied ... offer, rejected, withdrawn, accepted"
         INTEGER salary_range_min "nullable"
         INTEGER salary_range_max "nullable"
-        TEXT status "active | rejected | withdrawn"
+        TEXT status "active | rejected | withdrawn | accepted"
     }
     stage_history {
         INTEGER id PK

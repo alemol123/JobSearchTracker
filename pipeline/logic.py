@@ -14,8 +14,9 @@ STAGE_ORDER = {
     "offer": 6,
 }
 
-# Reachable from any active stage; once here, the application is closed.
-TERMINAL_STAGES = {"rejected", "withdrawn"}
+# Once here, the application is closed and can't move again.
+# rejected/withdrawn are reachable from any active stage; accepted only from offer.
+TERMINAL_STAGES = {"rejected", "withdrawn", "accepted"}
 
 
 class InvalidTransition(ValueError):
@@ -29,6 +30,11 @@ def validate_transition(current_stage, new_stage):
 
     if current_stage in TERMINAL_STAGES:
         raise InvalidTransition(f"Application is closed ({current_stage}) and cannot move.")
+
+    if new_stage == "accepted":
+        if current_stage != "offer":
+            raise InvalidTransition("Only an offer can be accepted.")
+        return
 
     if new_stage in TERMINAL_STAGES:
         return  # rejected/withdrawn are allowed from any active stage

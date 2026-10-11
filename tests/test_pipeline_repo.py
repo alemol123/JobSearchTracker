@@ -76,6 +76,17 @@ def test_change_stage_to_terminal_sets_status(conn, terminal):
     assert repo.get_application(conn, app_id)["status"] == terminal
 
 
+def test_accepting_an_offer_closes_the_application(conn):
+    app_id = _new_app(conn)
+    repo.change_stage(conn, app_id, "offer", now=datetime(2026, 10, 5))
+
+    repo.change_stage(conn, app_id, "accepted", now=datetime(2026, 10, 8))
+
+    app = repo.get_application(conn, app_id)
+    assert (app["current_stage"], app["status"]) == ("accepted", "accepted")
+    assert app_id not in repo.get_active_application_ids(conn)   # drops out of the skill gap
+
+
 def test_change_stage_on_missing_application_raises_lookup_error(conn):
     with pytest.raises(LookupError):
         repo.change_stage(conn, 999, "interview")
