@@ -36,6 +36,54 @@ uv run --no-project --with-requirements requirements.txt python app.py
 
 `requirements.txt` stays the project's only dependency manifest; uv just reads it.
 
+## Run with Docker
+
+The `Dockerfile` is the course-provided template with its four TODOs filled in (base image `python:3.12-slim`, `pip install -r requirements.txt`, the app's source files copied explicitly, `python app.py`). Inside the image `DATA_DIR` is `/data`, so a volume mounted there keeps the database between containers.
+
+```bash
+docker build -t jobtracker .
+docker run -p 8000:8000 -v jobtracker-data:/data jobtracker
+```
+
+Then open http://localhost:8000. To use another port:
+
+```bash
+docker run -e PORT=9000 -p 9000:9000 -v jobtracker-data:/data jobtracker
+```
+
+The app ships no seed data: it is useful empty, since all applications and skills are entered by the user. No `.db` file is committed; the schema is created on first boot with `CREATE TABLE IF NOT EXISTS`, which never touches existing tables or rows.
+
+### Container contract evidence (§7)
+
+Output of the provided `container/run.sh` against this repo (2026-10-12):
+
+```
+=== SDD Assignment 1 contract check ===
+Repository: /Users/alexandramolinsmacbook/Documents/Year_3/sdd/JobSearchTracker
+
+==> Repository shape
+  PASS  one Dockerfile, one manifest (requirements.txt)
+
+==> Build from a clean context, no build args
+  PASS  image built
+  PASS  image size 53 MB
+
+==> Start on PORT=8000 and reach it from the host
+  PASS  HTTP 302 from http://localhost:8000/
+
+==> SQLite file under DATA_DIR
+  PASS  found in /data: jobtracker.db
+
+==> Data persists, and a second boot does not re-seed
+  PASS  volume at /data persists
+  PASS  row counts unchanged across restart: application_skills=0 applications=0 my_skills=0 skills=0 stage_history=0
+
+==> PORT override is honoured (not hardcoded)
+  PASS  HTTP 302 from http://localhost:9123/
+
+=== ALL CHECKS PASSED ===
+```
+
 ## Configuration
 
 | Variable | Default | Purpose |
