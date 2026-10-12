@@ -28,6 +28,14 @@ python app.py
 
 Then open http://localhost:8000.
 
+**Alternative with [uv](https://docs.astral.sh/uv/):** if uv is installed, it creates the environment and installs from the same `requirements.txt` in one step (no venv or activate needed):
+
+```bash
+uv run --no-project --with-requirements requirements.txt python app.py
+```
+
+`requirements.txt` stays the project's only dependency manifest; uv just reads it.
+
 ## Configuration
 
 | Variable | Default | Purpose |
@@ -45,6 +53,12 @@ With the virtual environment active:
 
 ```bash
 pytest --cov=pipeline --cov=skills --cov-report=term-missing
+```
+
+Or with uv, without setting up a virtual environment first:
+
+```bash
+uv run --no-project --with-requirements requirements.txt pytest --cov=pipeline --cov=skills --cov-report=term-missing
 ```
 
 Result (2026-10-11, 154 tests):
