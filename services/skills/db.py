@@ -1,35 +1,48 @@
+import logging
 import os
-import sqlite3
+import time
+from urllib.parse import unquote, urlparse
 
-from flask import current_app, g
+import pymssql
+from flask import g
 
-DB_FILENAME = "jobtracker.db"
-SCHEMA_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "schema.sql")
-
-
-def db_path(data_dir):
-    return os.path.join(data_dir, DB_FILENAME)
+log = logging.getLogger(__name__)
 
 
-def connect(path):
-    conn = sqlite3.connect(path)
-    conn.row_factory = sqlite3.Row             # rows behave like dicts: row["company"]
-    conn.execute("PRAGMA foreign_keys = ON")   # SQLite ignores REFERENCES unless enabled
-    return conn
+def connect():
+    """Open one connection from DATABASE_URL, e.g. mssql://user:pw@host:1433/dbname."""
+    url = urlparse(os.environ["DATABASE_URL"])
+    return pymssql.connect(
+        server=url.hostname,
+        port=url.port or 1433,
+        user=unquote(url.username),
+        password=unquote(url.password),
+        database=url.path.lstrip("/"),
+        as_dict=True,          # rows come back as dicts: row["company"]
+        login_timeout=15,
+    )
 
 
-def init_db(path):
-    with open(SCHEMA_PATH) as f:
-        schema = f.read()
-    conn = connect(path)
-    conn.executescript(schema)
-    conn.close()
+def connect_with_retry(attempts=8, first_wait=2):
+    """Retry with exponential backoff: a paused Azure SQL database takes up to a minute
+    to resume and refuses connections meanwhile (error 40613)."""
+    wait = first_wait
+    for attempt in range(1, attempts + 1):
+        try:
+            return connect()
+        except pymssql.OperationalError as error:
+            if attempt == attempts:
+                raise
+            log.warning("DB connect failed (attempt %s/%s): %s; retrying in %ss",
+                        attempt, attempts, error, wait)
+            time.sleep(wait)
+            wait = min(wait * 2, 30)
 
 
 def get_db():
     # One connection per request, reused if asked for twice in the same request.
     if "db" not in g:
-        g.db = connect(current_app.config["DATABASE"])
+        g.db = connect_with_retry()
     return g.db
 
 

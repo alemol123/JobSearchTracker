@@ -17,7 +17,7 @@ SQL Server 2022 locally (compose); Azure SQL serverless in production.
 
 ## Rules
 - Each service reads `DATABASE_URL`, connects with retry and backoff (Azure error 40613), exposes `GET /health` (write + rollback on its own database; 200/503; never calls the other service), logs one line per request to stdout, and restricts CORS to `ALLOWED_ORIGIN`.
-- Migrations are numbered files in `services/<name>/migrations/`, applied by `migrate.py` at startup and recorded in `schema_migrations`. NEVER edit an applied migration; write a new one. `001_init.sql` is the original schema only. The data-changing migration is `002_add_last_stage_change.sql`.
+- Migrations are numbered files in `services/<name>/migrations/`, applied by `migrate.py` at startup and recorded in `schema_migrations`. NEVER edit an applied migration; write a new one. `001_init.sql` is the original schema plus the `health_check` table used by `/health`. The data-changing migration is `002_add_last_stage_change.sql`.
 - Dockerfiles: `python:3.12-slim`, no `COPY . .`, pinned dependencies, non-root user. About 12 third-party packages per service at most.
 - No secrets in any committed file. Local compose passwords are throwaway defaults; Azure secrets are GitHub Actions secrets only.
 - Tests run against a local or CI SQL Server container, never Azure SQL. Coverage must be at least 70% per service.
