@@ -1,0 +1,45 @@
+name: CI
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [pipeline, skills]
+    defaults:
+      run:
+        working-directory: services/${{ matrix.service }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - run: ruff check .
+      # pytest against a SQL Server container is added once the tests are ported (Day 3)
+
+  images:
+    needs: test                       # no image from a commit that failed lint/tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write                 # lets GITHUB_TOKEN push to ghcr.io
+    strategy:
+      matrix:
+        service: [pipeline, skills]
+    steps:
+      - uses: actions/checkout@v4
+      # Image names must be lowercase; ${VAR,,} lowercases the owner name.
+      - run: echo "OWNER=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_ENV"
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        if: github.ref == 'refs/heads/main'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: services/${{ matrix.service }}
+          push: ${{ github.ref == 'refs/heads/main' }}   # every push/PR builds, only main publishes
+          tags: ghcr.io/${{ env.OWNER }}/jst-${{ matrix.service }}:${{ github.sha }}

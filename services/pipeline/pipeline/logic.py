@@ -1,6 +1,7 @@
 """Pipeline business rules. Pure functions: no Flask, no SQL."""
 
 from datetime import date
+from itertools import pairwise
 
 SOURCES = ("referral", "job_board", "cold_apply", "other")
 
@@ -94,7 +95,7 @@ def conversion_rates_by_source(applications):
     result = {}
     for source, max_reached in max_reached_by_source.items():
         rows = []
-        for from_stage, to_stage in zip(ordered_stages, ordered_stages[1:]):
+        for from_stage, to_stage in pairwise(ordered_stages):
             # ">=" because skipping a stage still means you got past it.
             reached = sum(1 for m in max_reached if m >= STAGE_ORDER[from_stage])
             advanced = sum(1 for m in max_reached if m >= STAGE_ORDER[to_stage])

@@ -5,9 +5,9 @@ Dependency goes one way: skills may call the pipeline's repository functions
 """
 
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
+from pipeline import repository as pipeline_repo
 
 from db import get_db
-from pipeline import repository as pipeline_repo
 from skills import logic
 from skills import repository as repo
 
