@@ -1,0 +1,56 @@
+# Local-only throwaway passwords (defaults below). Azure uses different ones, stored as GitHub secrets.
+x-sa: &sa ${MSSQL_SA_PASSWORD:-Local_Sa_Passw0rd!}
+
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    platform: linux/amd64
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: *sa
+    ports: ["1433:1433"]
+    volumes: [mssql-data:/var/opt/mssql]
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -Q 'SELECT 1' || exit 1"]
+      interval: 5s
+      retries: 30
+      start_period: 20s
+
+  db-init:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    platform: linux/amd64
+    depends_on:
+      sqlserver: { condition: service_healthy }
+    environment:
+      MSSQL_SA_PASSWORD: *sa
+      PIPELINE_PW: ${PIPELINE_DB_PASSWORD:-Local_Pipeline_Passw0rd!}
+      SKILLS_PW: ${SKILLS_DB_PASSWORD:-Local_Skills_Passw0rd!}
+    volumes: ["./db:/db:ro"]
+    entrypoint: ["/bin/bash", "-c", "/opt/mssql-tools18/bin/sqlcmd -S sqlserver -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -b -i /db/init.sql"]
+    restart: "no"
+
+  pipeline:
+    build: ./services/pipeline
+    depends_on:
+      db-init: { condition: service_completed_successfully }
+    environment:
+      DATABASE_URL: mssql://pipeline_user:${PIPELINE_DB_PASSWORD:-Local_Pipeline_Passw0rd!}@sqlserver:1433/pipeline
+      ALLOWED_ORIGIN: http://localhost:8080
+      STALE_DAYS: "14"
+      GIT_SHA: local
+    ports: ["8001:8000"]
+
+  skills:
+    build: ./services/skills
+    depends_on:
+      db-init: { condition: service_completed_successfully }
+    environment:
+      DATABASE_URL: mssql://skills_user:${SKILLS_DB_PASSWORD:-Local_Skills_Passw0rd!}@sqlserver:1433/skills
+      PIPELINE_URL: http://pipeline:8000
+      PIPELINE_TIMEOUT_S: "2"
+      ALLOWED_ORIGIN: http://localhost:8080
+      GIT_SHA: local
+    ports: ["8002:8000"]
+
+volumes:
+  mssql-data:
