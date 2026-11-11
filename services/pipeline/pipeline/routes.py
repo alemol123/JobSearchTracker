@@ -2,8 +2,16 @@
 
 from datetime import date
 
-from flask import (Blueprint, abort, current_app, flash, redirect, render_template,
-                   request, url_for)
+from flask import (
+    Blueprint,
+    abort,
+    current_app,
+    flash,
+    redirect,
+    render_template,
+    request,
+    url_for,
+)
 
 from db import get_db
 from pipeline import logic
