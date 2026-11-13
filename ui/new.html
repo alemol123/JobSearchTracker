@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>New application · Job Search Tracker</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="index.html">Job Search Tracker</a>
+      <nav>
+        <a href="index.html" class="active">Applications</a>
+        <a href="skills.html">Skills</a>
+        <a href="gap.html">Skill gap</a>
+      </nav>
+    </div>
+  </header>
+  <main class="container">
+    <div id="messages"></div>
+
+    <div class="page-header">
+      <div>
+        <h1>New application</h1>
+        <p class="muted">It starts in the "applied" stage on the date you applied.</p>
+      </div>
+      <a class="btn btn-outline" href="index.html">Cancel</a>
+    </div>
+
+    <section class="card">
+      <form id="new-form" class="form-grid">
+        <label>Company <input name="company" required></label>
+        <label>Role <input name="role" required></label>
+        <label>Source
+          <!-- Same values as SOURCES in services/pipeline/pipeline/logic.py -->
+          <select name="source">
+            <option value="referral">referral</option>
+            <option value="job_board">job board</option>
+            <option value="cold_apply">cold apply</option>
+            <option value="other">other</option>
+          </select>
+        </label>
+        <label>Date applied <input type="date" name="date_applied" required></label>
+        <label>Salary min (optional) <input name="salary_range_min" inputmode="numeric"></label>
+        <label>Salary max (optional) <input name="salary_range_max" inputmode="numeric"></label>
+        <div class="full"><button type="submit">Add application</button></div>
+      </form>
+    </section>
+  </main>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+  <script>
+    const form = document.getElementById("new-form");
+    form.date_applied.value = new Date().toISOString().slice(0, 10);   // default: today
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();                      // don't do a normal form POST: send JSON instead
+      try {
+        const { id } = await send("PIPELINE_URL", "/applications", "POST", formData(form));
+        location.href = `application.html?id=${id}`;
+      } catch (error) {
+        // 400 comes back with a list of errors; show them all, keep what was typed.
+        showMessage(error.body?.errors || error.message, "error");
+      }
+    });
+  </script>
+</body>
+</html>

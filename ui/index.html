@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Applications · Job Search Tracker</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="index.html">Job Search Tracker</a>
+      <nav>
+        <a href="index.html" class="active">Applications</a>
+        <a href="skills.html">Skills</a>
+        <a href="gap.html">Skill gap</a>
+      </nav>
+    </div>
+  </header>
+  <main class="container">
+    <div id="messages"></div>
+
+    <div class="page-header">
+      <div>
+        <h1>Applications</h1>
+        <p class="muted">Every job you've applied to and where it stands.</p>
+      </div>
+      <a class="btn" href="new.html">+ New application</a>
+    </div>
+
+    <section class="card" id="applications"><p class="muted">Loading…</p></section>
+
+    <div id="rates"></div>
+  </main>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+  <script>
+    function renderApplications(data) {
+      const box = document.getElementById("applications");
+      if (data.applications.length === 0) {
+        box.replaceChildren(el("p", {}, "No applications yet. ",
+                               el("a", { href: "new.html" }, "Add your first one"), "."));
+        return;
+      }
+      const rows = data.applications.map((a) =>
+        el("tr", { class: a.stale ? "row-stale" : "" },
+          el("td", {}, el("a", { href: `application.html?id=${a.id}` }, a.company)),
+          el("td", {}, a.role),
+          el("td", { class: "muted" }, label(a.source)),
+          el("td", {}, stageBadge(a.current_stage)),
+          el("td", {}, a.days_in_stage, " ", a.stale && el("span", { class: "badge badge-warning" }, "stale")),
+          el("td", {}, el("span", { class: "badge badge-outline" }, a.status))));
+      box.replaceChildren(
+        el("div", { class: "table-wrap" },
+          el("table", {},
+            el("thead", {}, el("tr", {}, ["Company", "Role", "Source", "Stage", "Days in stage", "Status"]
+                                          .map((h) => el("th", {}, h)))),
+            el("tbody", {}, rows))),
+        el("p", { class: "muted" },
+           `"Stale" = active with no stage change for more than ${data.stale_days} days.`));
+    }
+
+    function renderRates(data) {
+      const sources = Object.entries(data.rates);
+      if (sources.length === 0) return;
+      const cards = sources.map(([source, rows]) =>
+        el("section", { class: "card" },
+          el("h2", {}, label(source)),
+          el("table", {},
+            el("thead", {}, el("tr", {}, el("th", {}, "Step"), el("th", {}, "Moved on"), el("th", {}, "Rate"))),
+            el("tbody", {}, rows.map((r) => {
+              const percent = r.rate === null ? null : Math.round(r.rate * 100);
+              return el("tr", {},
+                el("td", {}, `${label(r.from_stage)} → ${label(r.to_stage)}`),
+                el("td", { class: "muted" }, `${r.advanced} / ${r.reached}`),
+                el("td", {}, percent === null
+                  ? el("span", { class: "muted" }, "—")
+                  : el("div", { class: "bar-cell" },
+                      el("div", { class: "bar" }, el("span", { style: `width: ${percent}%` })),
+                      `${percent}%`)));
+            })))));
+      document.getElementById("rates").replaceChildren(
+        el("h2", {}, "Conversion by source"), el("div", { class: "card-grid" }, cards));
+    }
+
+    api("PIPELINE_URL", "/applications").then(renderApplications).catch((error) => {
+      document.getElementById("applications").replaceChildren();
+      showMessage(error.message, "error");
+    });
+    api("PIPELINE_URL", "/applications/conversion-rates").then(renderRates).catch(() => {});
+  </script>
+</body>
+</html>
