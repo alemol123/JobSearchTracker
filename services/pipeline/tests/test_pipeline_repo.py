@@ -35,11 +35,23 @@ def test_create_application_writes_first_history_row_on_date_applied(conn):
     history = repo.get_stage_history(conn, app_id)
 
     assert [h["stage"] for h in history] == ["applied"]
-    assert history[0]["entered_at"] == "2026-09-15T00:00:00"
+    assert history[0]["entered_at"] == datetime(2026, 9, 15, 0, 0)   # DATETIME2 -> Python datetime
 
 
 def test_get_application_returns_none_for_missing_id(conn):
-    assert repo.get_application(conn, 999) is None
+    assert repo.get_application(conn, 999999) is None
+
+
+def test_create_application_keeps_null_salaries(conn):
+    app_id = repo.create_application(conn, {
+        "company": "Acme", "role": "Dev", "source": "other", "date_applied": date(2026, 10, 1),
+        "salary_range_min": None, "salary_range_max": None,
+    })
+
+    app = repo.get_application(conn, app_id)
+
+    assert (app["salary_range_min"], app["salary_range_max"]) == (None, None)
+    assert app["date_applied"] == date(2026, 10, 1)                  # DATE -> Python date
 
 
 # ---------- change_stage ----------
@@ -89,7 +101,7 @@ def test_accepting_an_offer_closes_the_application(conn):
 
 def test_change_stage_on_missing_application_raises_lookup_error(conn):
     with pytest.raises(LookupError):
-        repo.change_stage(conn, 999, "interview")
+        repo.change_stage(conn, 999999, "interview")
 
 
 # ---------- list / active ids / conversion input ----------
