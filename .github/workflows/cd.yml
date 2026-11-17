@@ -1,0 +1,106 @@
+name: CD
+# Deploys to Azure after CI has passed on a push to main. CI already built the images and
+# pushed them to GHCR tagged with the commit SHA, so CD deploys exactly those images.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+  id-token: write          # lets the job ask GitHub for an OIDC token to sign in to Azure
+
+concurrency: cd            # never two deployments at once (migrations run at container start)
+
+env:
+  P: amolins-ieu2024
+  RG: rg-amolins
+  UI_STORAGE: amolinsieu2024ui          # storage names can't contain hyphens (ADR-8)
+  SHA: ${{ github.event.workflow_run.head_sha }}
+
+jobs:
+  deploy:
+    # Only when CI passed, and only for pushes (merges) to main, not for pull requests.
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: "${{ env.SHA }}" }          # exactly the commit CI tested
+
+      # No password: Azure trusts GitHub's OIDC token for this repo's main branch and
+      # signs us in as the managed identity amolins-ieu2024-github-id (Contributor on rg-amolins).
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy both Container Apps
+        env:
+          PIPELINE_DB_URL: ${{ secrets.PIPELINE_DATABASE_URL }}
+          SKILLS_DB_URL: ${{ secrets.SKILLS_DATABASE_URL }}
+        run: |
+          az extension add --name containerapp --upgrade -y --only-show-errors
+          REGISTRY="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}"      # image names must be lowercase
+          # The UI's address is the only origin allowed by CORS (no trailing slash).
+          ORIGIN=$(az storage account show -g $RG -n $UI_STORAGE --query primaryEndpoints.web -o tsv)
+          ORIGIN=${ORIGIN%/}
+
+          # Create the app the first time, update it after. The DB URL is a Container Apps
+          # secret (db-url); the app only sees it through DATABASE_URL=secretref:db-url.
+          deploy_app() {
+            NAME=$1; IMAGE=$2; DB_URL=$3; shift 3
+            if az containerapp show -g $RG -n $NAME -o none 2>/dev/null; then
+              az containerapp secret set -g $RG -n $NAME --secrets db-url="$DB_URL" -o none
+              az containerapp update -g $RG -n $NAME --image $IMAGE \
+                --min-replicas 0 --max-replicas 1 \
+                --set-env-vars DATABASE_URL=secretref:db-url GIT_SHA=$SHA ALLOWED_ORIGIN=$ORIGIN "$@" -o none
+            else
+              az containerapp create -g $RG -n $NAME --environment $P-env --image $IMAGE \
+                --ingress external --target-port 8000 --min-replicas 0 --max-replicas 1 \
+                --cpu 0.25 --memory 0.5Gi --secrets db-url="$DB_URL" \
+                --env-vars DATABASE_URL=secretref:db-url GIT_SHA=$SHA ALLOWED_ORIGIN=$ORIGIN "$@" -o none
+            fi
+            az containerapp show -g $RG -n $NAME --query properties.configuration.ingress.fqdn -o tsv
+          }
+
+          PIPELINE_HOST=$(deploy_app $P-pipeline $REGISTRY/jst-pipeline:$SHA "$PIPELINE_DB_URL" STALE_DAYS=14)
+          # Azure timeout is 10 s, not 2 s: a pipeline container waking from zero answers slowly.
+          SKILLS_HOST=$(deploy_app $P-skills $REGISTRY/jst-skills:$SHA "$SKILLS_DB_URL" \
+            PIPELINE_URL=https://$PIPELINE_HOST PIPELINE_TIMEOUT_S=10)
+          echo "PIPELINE_HOST=$PIPELINE_HOST" >> $GITHUB_ENV
+          echo "SKILLS_HOST=$SKILLS_HOST" >> $GITHUB_ENV
+          echo "UI_URL=$ORIGIN" >> $GITHUB_ENV
+
+      - name: Write the UI config with the live service URLs
+        run: |
+          cat > ui/config.js <<EOF
+          window.CONFIG = {
+            PIPELINE_URL: "https://$PIPELINE_HOST",
+            SKILLS_URL: "https://$SKILLS_HOST",
+          };
+          EOF
+
+      - name: Upload the UI to the storage static website
+        # $web is the container a storage static website serves from. Contributor may read the
+        # account key, which --auth-mode key uses. no-cache: browsers always fetch the new config.js.
+        run: |
+          az storage blob upload-batch --account-name $UI_STORAGE --auth-mode key \
+            --destination '$web' --source ui --overwrite --content-cache-control "no-cache" \
+            --only-show-errors -o none
+          echo "UI deployed to $UI_URL"
+
+      - name: Wait for both services to be healthy on the new version
+        # Up to 5 minutes: the container starts from zero, the database may be paused
+        # (about a minute to resume), and migrations run before the server starts.
+        run: |
+          for URL in https://$PIPELINE_HOST/health https://$SKILLS_HOST/health; do
+            for i in $(seq 1 30); do                       # 30 x 10 s = 5 minutes
+              if curl -fsS --max-time 30 "$URL" | grep -q "$SHA"; then
+                echo "healthy: $URL"; continue 2
+              fi
+              echo "not healthy yet ($i/30): $URL"; sleep 10
+            done
+            echo "::error::$URL did not return 200 with version $SHA within 5 minutes"; exit 1
+          done
