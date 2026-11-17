@@ -2,20 +2,58 @@
 
 const SERVICE_NAMES = { PIPELINE_URL: "application pipeline", SKILLS_URL: "skills" };
 
+// Cold starts on Azure: a service that scaled to zero needs up to about a minute to start
+// (container start, database resume, migrations). Meanwhile the platform answers with a
+// 502/503/504 that has no JSON body and no CORS headers, so the browser may only see a
+// network error. Both cases count as "still waking up".
+const REQUEST_TIMEOUT_MS = 45000;       // never let a request hang: give up after 45 s
+const WAKE_RETRIES = 2;                 // reads (GET) are retried this many times
+const WAKE_RETRY_DELAY_MS = 5000;
+
+// Same words for "starting up" and "really down": from the browser the two look identical.
+function wakingUpMessage(service) {
+  return `The ${SERVICE_NAMES[service]} service isn't answering yet (it sleeps when nobody ` +
+         "uses it and needs up to a minute to start). Try again in a minute.";
+}
+
+// One request with a time limit. Returns the response, or null if there was no answer.
+async function fetchOnce(url, options) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    return await fetch(url, { headers: { "Content-Type": "application/json" }, ...options,
+                              signal: controller.signal });
+  } catch {
+    return null;                        // no answer: service down, starting up, CORS blocked, timeout
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // Call one of the services and return the JSON body.
 // Throws an Error with a readable message on any failure (the body is kept on error.body).
 async function api(service, path, options = {}) {
-  let response;
-  try {
-    response = await fetch(window.CONFIG[service] + path, {
-      headers: { "Content-Type": "application/json" },
-      ...options,
-    });
-  } catch {
-    // fetch only throws when there is no answer at all (service down, CORS blocked).
-    throw new Error(`Can't reach the ${SERVICE_NAMES[service]} service right now.`);
+  const url = window.CONFIG[service] + path;
+  // Only reads are retried: repeating a POST could, for example, create an application twice.
+  const retries = (options.method || "GET") === "GET" ? WAKE_RETRIES : 0;
+  let response, body;
+  for (let attempt = 0; ; attempt++) {
+    response = await fetchOnce(url, options);
+    body = response ? await response.json().catch(() => null) : null;
+    // Our services always answer errors with JSON; an answer without JSON (or none at all)
+    // comes from the platform while the service is not up yet.
+    const wakingUp = response === null || ([502, 503, 504].includes(response.status) && body === null);
+    if (!wakingUp) break;
+    if (attempt >= retries) {
+      const error = new Error(wakingUpMessage(service));
+      error.status = response ? response.status : 503;
+      throw error;
+    }
+    showMessage(`Waking up the ${SERVICE_NAMES[service]} service, this can take up to a minute…`);
+    await new Promise((resolve) => setTimeout(resolve, WAKE_RETRY_DELAY_MS));
+    clearMessage();
   }
-  const body = await response.json().catch(() => ({}));
+  body = body || {};
   if (!response.ok) {
     const message = body.error || (body.errors || []).join(" ") || `Request failed (${response.status})`;
     const error = new Error(message);
