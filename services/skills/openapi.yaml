@@ -1,0 +1,316 @@
+openapi: 3.0.3
+info:
+  title: Skills service
+  version: "1.0.0"
+  description: >
+    Skills, my proficiency in each, the skills each application requires, and the
+    skill gap. Owns the tables skills, my_skills and application_skills. Calls the
+    pipeline service for GET /applications/active-ids (gap) and GET /applications/{id}
+    (tagging); see services/pipeline/openapi.yaml for those shapes.
+servers:
+  - url: http://localhost:8002
+    description: Local (docker compose)
+
+paths:
+  /health:
+    get:
+      summary: Can this service read and write its own database?
+      description: Writes a row to health_check and rolls back. Never calls the pipeline service.
+      responses:
+        "200":
+          description: Database readable and writable
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Health" }
+        "503":
+          description: Database unavailable
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Health" }
+
+  /skills:
+    get:
+      summary: All skills (archived included), sorted by name, with my proficiency
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [skills, max_level]
+                properties:
+                  skills:
+                    type: array
+                    items: { $ref: "#/components/schemas/Skill" }
+                  max_level: { type: integer, description: Highest proficiency level (5) }
+    post:
+      summary: Add a skill (re-adding an archived name restores it)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, maxLength: 50 }
+                category: { type: string, nullable: true }
+      responses:
+        "201":
+          description: Created (or restored)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id]
+                properties:
+                  id: { type: integer }
+        "400":
+          description: Validation failed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ValidationErrors" }
+        "409":
+          description: A skill with this name already exists
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /skills/{skill_id}/proficiency:
+    parameters:
+      - $ref: "#/components/parameters/SkillId"
+    put:
+      summary: Set my proficiency (1-5), or remove it with a blank or null level
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                level:
+                  type: integer
+                  minimum: 1
+                  maximum: 5
+                  nullable: true
+                  description: null (or "") means I don't have this skill
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Ok" }
+        "400":
+          description: Level is not a whole number between 1 and 5
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Skill not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /skills/{skill_id}/archive:
+    parameters:
+      - $ref: "#/components/parameters/SkillId"
+    post:
+      summary: Archive a skill (soft delete; existing tags and proficiency are kept)
+      responses:
+        "200":
+          description: Archived
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Ok" }
+        "404":
+          description: Skill not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /skills/gap:
+    get:
+      summary: Skills demanded by active applications, ranked (crosses the seam)
+      description: >
+        Gets the active application IDs from pipeline (GET /applications/active-ids,
+        with a timeout). If pipeline is unavailable it still answers 200, with
+        pipeline_available false, empty lists and a notice.
+      responses:
+        "200":
+          description: Ranked gap, or a degraded answer when pipeline is unavailable
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Gap" }
+
+  /applications/{app_id}/skills:
+    parameters:
+      - $ref: "#/components/parameters/AppId"
+    get:
+      summary: Skills tagged on an application, and the skills still available to tag
+      description: Does not call pipeline, so it works when pipeline is down.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [tagged, available]
+                properties:
+                  tagged:
+                    type: array
+                    items: { $ref: "#/components/schemas/TaggedSkill" }
+                  available:
+                    type: array
+                    description: Non-archived skills not yet tagged on this application
+                    items: { $ref: "#/components/schemas/Skill" }
+    post:
+      summary: Tag a skill on an application
+      description: >
+        First checks the application exists with pipeline GET /applications/{id}.
+        Fails closed: if pipeline does not answer, nothing is tagged and the answer is 503.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [skill_id]
+              properties:
+                skill_id: { type: integer }
+      responses:
+        "201":
+          description: Tagged (tagging the same skill twice is a no-op)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Ok" }
+        "400":
+          description: Skill not found, archived, or skill_id missing
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Application not found in pipeline
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "503":
+          description: Pipeline unavailable, so the application could not be checked
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /applications/{app_id}/skills/{skill_id}:
+    parameters:
+      - $ref: "#/components/parameters/AppId"
+      - $ref: "#/components/parameters/SkillId"
+    delete:
+      summary: Remove a skill from an application (no-op if it was not tagged)
+      responses:
+        "200":
+          description: Removed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Ok" }
+
+components:
+  parameters:
+    SkillId:
+      name: skill_id
+      in: path
+      required: true
+      schema: { type: integer }
+    AppId:
+      name: app_id
+      in: path
+      required: true
+      description: Application ID from the pipeline service (no foreign key in this database)
+      schema: { type: integer }
+
+  schemas:
+    Health:
+      type: object
+      required: [status, db, version]
+      properties:
+        status: { type: string, enum: [ok, error] }
+        db: { type: string, enum: [ok, unavailable] }
+        version: { type: string, description: Git commit SHA (GIT_SHA) }
+
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+
+    ValidationErrors:
+      type: object
+      required: [errors]
+      properties:
+        errors:
+          type: array
+          items: { type: string }
+
+    Ok:
+      type: object
+      required: [ok]
+      properties:
+        ok: { type: boolean }
+
+    Skill:
+      type: object
+      required: [id, name, category, archived, proficiency_level]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        category: { type: string, nullable: true }
+        archived: { type: boolean }
+        proficiency_level:
+          type: integer
+          minimum: 1
+          maximum: 5
+          nullable: true
+          description: null if I don't have this skill
+
+    TaggedSkill:
+      type: object
+      required: [id, name, archived]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        archived: { type: boolean }
+
+    Priority:
+      type: object
+      required: [skill_id, name, demand, proficiency, gap, score]
+      properties:
+        skill_id: { type: integer }
+        name: { type: string, nullable: true }
+        demand: { type: integer, description: Active applications that require it }
+        proficiency: { type: integer, description: "My level, 0 if I don't have it" }
+        gap: { type: integer, description: 5 - proficiency }
+        score: { type: integer, description: demand x gap }
+
+    MissingSkill:
+      type: object
+      required: [skill_id, name, demand]
+      properties:
+        skill_id: { type: integer }
+        name: { type: string, nullable: true }
+        demand: { type: integer }
+
+    Gap:
+      type: object
+      required: [pipeline_available, priorities, missing]
+      properties:
+        pipeline_available: { type: boolean }
+        priorities:
+          type: array
+          items: { $ref: "#/components/schemas/Priority" }
+        missing:
+          type: array
+          description: Demanded skills I don't have, most-demanded first
+          items: { $ref: "#/components/schemas/MissingSkill" }
+        notice:
+          type: string
+          description: Only present when pipeline_available is false
