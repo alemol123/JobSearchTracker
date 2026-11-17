@@ -1,107 +1,103 @@
-"""A few end-to-end checks of the skills pages through Flask's test client.
-The rules themselves are tested in test_skills_logic.py."""
+"""The skills JSON API through Flask's test client. The rules themselves are tested
+in test_skills_logic.py, and the calls to pipeline in test_cross_seam.py.
 
-APPLICATION = {
-    "company": "Acme",
-    "role": "Backend Developer",
-    "source": "referral",
-    "date_applied": "2026-10-01",
-    "salary_range_min": "",
-    "salary_range_max": "",
-}
+IDs come from the responses: SQL Server keeps counting IDENTITY values after a
+DELETE, so the first skill of a test is not always id 1."""
+
+import responses
+
+PIPELINE = "http://pipeline:8000"
 
 
-def _add_skill(client, name):
-    return client.post("/skills/", data={"name": name, "category": ""}, follow_redirects=True)
+def _add_skill(client, name, category=None):
+    response = client.post("/skills", json={"name": name, "category": category})
+    assert response.status_code == 201
+    return response.get_json()["id"]
 
 
-def test_skills_page_loads_empty(client):
-    response = client.get("/skills/")
-
-    assert response.status_code == 200
-    assert b"No skills yet" in response.data
+def test_skills_list_is_empty_at_first(client):
+    assert client.get("/skills").get_json() == {"skills": [], "max_level": 5}
 
 
-def test_add_skill_shows_it_in_the_list(client):
-    response = _add_skill(client, "Docker")
+def test_added_skill_is_in_the_list(client):
+    skill_id = _add_skill(client, "Docker", "tool")
 
-    assert b"Skill added" in response.data
-    assert b"Docker" in response.data
+    [skill] = client.get("/skills").get_json()["skills"]
+
+    assert skill == {"id": skill_id, "name": "Docker", "category": "tool",
+                     "archived": False, "proficiency_level": None}
 
 
-def test_invalid_or_duplicate_skill_shows_error(client):
+def test_duplicate_skill_is_409_and_blank_name_is_400(client):
     _add_skill(client, "Docker")
 
-    assert b"already exists" in _add_skill(client, "docker").data
-    assert b"Skill name is required" in _add_skill(client, " ").data
+    duplicate = client.post("/skills", json={"name": "docker"})
+    blank = client.post("/skills", json={"name": " "})
+
+    assert duplicate.status_code == 409 and "already exists" in duplicate.get_json()["error"]
+    assert blank.status_code == 400 and blank.get_json()["errors"] == ["Skill name is required."]
 
 
 def test_set_and_clear_proficiency(client):
-    _add_skill(client, "Docker")
+    skill_id = _add_skill(client, "Docker")
+    url = f"/skills/{skill_id}/proficiency"
 
-    saved = client.post("/skills/1/proficiency", data={"level": "3"}, follow_redirects=True)
-    bad = client.post("/skills/1/proficiency", data={"level": "9"}, follow_redirects=True)
-    cleared = client.post("/skills/1/proficiency", data={"level": ""}, follow_redirects=True)
+    assert client.put(url, json={"level": 3}).status_code == 200
+    assert client.get("/skills").get_json()["skills"][0]["proficiency_level"] == 3
 
-    assert b"Proficiency saved" in saved.data
-    assert b"between 1 and 5" in bad.data
-    assert b"Removed from my skills" in cleared.data
-
-
-def test_archive_skill_moves_it_to_archived_section(client):
-    _add_skill(client, "Perl")
-
-    response = client.post("/skills/1/archive", follow_redirects=True)
-
-    assert b"archived" in response.data
-    assert b'action="/skills/1/archive"' not in response.data
-
-
-def test_archive_missing_skill_is_404(client):
-    assert client.post("/skills/999/archive").status_code == 404
-
-
-def test_tag_and_untag_skill_on_application(client):
-    client.post("/applications/new", data=APPLICATION)
-    _add_skill(client, "Docker")
-
-    tagged = client.post("/skills/applications/1/tag", data={"skill_id": "1"}, follow_redirects=True)
-    assert b"Docker" in tagged.data and b"Remove" in tagged.data
-
-    untagged = client.post("/skills/applications/1/untag", data={"skill_id": "1"},
-                           follow_redirects=True)
-    assert b"No skills tagged yet" in untagged.data
-
-
-def test_tagging_unknown_skill_shows_error(client):
-    client.post("/applications/new", data=APPLICATION)
-
-    response = client.post("/skills/applications/1/tag", data={"skill_id": "999"},
-                           follow_redirects=True)
-
-    assert b"not found" in response.data
-
-
-def test_skills_page_for_missing_application_is_404(client):
-    assert client.get("/skills/applications/999").status_code == 404
-
-
-def test_gap_page_scores_only_active_applications(client):
-    # Application 1 (active) wants Docker; application 2 (rejected) wants Perl.
-    client.post("/applications/new", data=APPLICATION)
-    client.post("/applications/new", data={**APPLICATION, "company": "Beta"})
-    _add_skill(client, "Docker")
-    _add_skill(client, "Perl")
-    client.post("/skills/applications/1/tag", data={"skill_id": "1"})
-    client.post("/skills/applications/2/tag", data={"skill_id": "2"})
-    client.post("/applications/2/stage", data={"stage": "rejected"})
-
-    response = client.get("/skills/gap")
-
-    assert response.status_code == 200
-    assert b"Docker" in response.data
-    assert b"Perl" not in response.data
+    assert client.put(url, json={"level": 9}).status_code == 400
+    assert client.put(url, json={"level": ""}).status_code == 200     # blank = I don't have it
+    assert client.get("/skills").get_json()["skills"][0]["proficiency_level"] is None
 
 
 def test_proficiency_for_missing_skill_is_404(client):
-    assert client.post("/skills/999/proficiency", data={"level": "3"}).status_code == 404
+    assert client.put("/skills/999999/proficiency", json={"level": 3}).status_code == 404
+
+
+def test_archive_skill(client):
+    skill_id = _add_skill(client, "Perl")
+
+    assert client.post(f"/skills/{skill_id}/archive").get_json() == {"ok": True}
+    assert client.get("/skills").get_json()["skills"][0]["archived"] is True
+
+
+def test_archive_missing_skill_is_404(client):
+    assert client.post("/skills/999999/archive").status_code == 404
+
+
+@responses.activate
+def test_tag_list_and_untag_skill_on_application(client):
+    responses.get(f"{PIPELINE}/applications/1", json={"application": {"id": 1}})   # pipeline: it exists
+    docker = _add_skill(client, "Docker")
+    python = _add_skill(client, "Python")
+
+    tagged = client.post("/applications/1/skills", json={"skill_id": docker})
+    body = client.get("/applications/1/skills").get_json()
+
+    assert tagged.status_code == 201
+    assert [s["name"] for s in body["tagged"]] == ["Docker"]
+    assert [s["name"] for s in body["available"]] == ["Python"]
+    assert python not in [s["id"] for s in body["tagged"]]
+
+    assert client.delete(f"/applications/1/skills/{docker}").status_code == 200
+    assert client.get("/applications/1/skills").get_json()["tagged"] == []
+
+
+@responses.activate
+def test_tagging_unknown_or_archived_skill_is_400(client):
+    responses.get(f"{PIPELINE}/applications/1", json={"application": {"id": 1}})
+    perl = _add_skill(client, "Perl")
+    client.post(f"/skills/{perl}/archive")
+
+    unknown = client.post("/applications/1/skills", json={"skill_id": 999999})
+    archived = client.post("/applications/1/skills", json={"skill_id": perl})
+    not_a_number = client.post("/applications/1/skills", json={"skill_id": "abc"})
+
+    assert unknown.status_code == 400 and "not found" in unknown.get_json()["error"]
+    assert archived.status_code == 400 and "archived" in archived.get_json()["error"]
+    assert not_a_number.status_code == 400
+
+
+def test_tags_of_an_application_do_not_need_pipeline(client):
+    # No stub registered: if this route called pipeline, the test would fail.
+    assert client.get("/applications/5/skills").get_json() == {"tagged": [], "available": []}

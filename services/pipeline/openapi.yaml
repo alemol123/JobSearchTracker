@@ -1,0 +1,266 @@
+openapi: 3.0.3
+info:
+  title: Pipeline service
+  version: "1.0.0"
+  description: >
+    Job applications, their stages and stage history. Owns the tables applications
+    and stage_history. The skills service calls GET /applications/active-ids and
+    GET /applications/{id}; this service never calls skills.
+servers:
+  - url: http://localhost:8001
+    description: Local (docker compose)
+
+paths:
+  /health:
+    get:
+      summary: Can this service read and write its own database?
+      description: Writes a row to health_check and rolls back. Never calls the skills service.
+      responses:
+        "200":
+          description: Database readable and writable
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Health" }
+        "503":
+          description: Database unavailable
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Health" }
+
+  /applications:
+    get:
+      summary: List all applications, newest first, with days in stage and stale flag
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [applications, stale_days]
+                properties:
+                  applications:
+                    type: array
+                    items: { $ref: "#/components/schemas/Application" }
+                  stale_days:
+                    type: integer
+                    description: Value of STALE_DAYS used to compute the stale flag
+    post:
+      summary: Create an application in stage 'applied'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NewApplication" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id]
+                properties:
+                  id: { type: integer }
+        "400":
+          description: Validation failed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ValidationErrors" }
+
+  /applications/conversion-rates:
+    get:
+      summary: Share of applications that moved past each stage, per source
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [rates]
+                properties:
+                  rates:
+                    type: object
+                    description: One key per source that has applications (referral, job_board, ...)
+                    additionalProperties:
+                      type: array
+                      items: { $ref: "#/components/schemas/ConversionRate" }
+
+  /applications/active-ids:
+    get:
+      summary: IDs of applications whose status is active (called by the skills service)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ids]
+                properties:
+                  ids:
+                    type: array
+                    items: { type: integer }
+
+  /applications/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ApplicationId"
+    get:
+      summary: One application with its history (also called by skills to check it exists)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApplicationDetail" }
+        "404":
+          description: Application not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /applications/{id}/stage:
+    parameters:
+      - $ref: "#/components/parameters/ApplicationId"
+    post:
+      summary: Move the application to a new stage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [stage]
+              properties:
+                stage: { $ref: "#/components/schemas/Stage" }
+      responses:
+        "200":
+          description: Stage changed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Ok" }
+        "400":
+          description: Transition not allowed (backwards, closed application, unknown stage)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Application not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+components:
+  parameters:
+    ApplicationId:
+      name: id
+      in: path
+      required: true
+      schema: { type: integer }
+
+  schemas:
+    Health:
+      type: object
+      required: [status, db, version]
+      properties:
+        status: { type: string, enum: [ok, error] }
+        db: { type: string, enum: [ok, unavailable] }
+        version: { type: string, description: Git commit SHA (GIT_SHA) }
+
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+
+    ValidationErrors:
+      type: object
+      required: [errors]
+      properties:
+        errors:
+          type: array
+          items: { type: string }
+
+    Ok:
+      type: object
+      required: [ok]
+      properties:
+        ok: { type: boolean }
+
+    Source:
+      type: string
+      enum: [referral, job_board, cold_apply, other]
+
+    Stage:
+      type: string
+      enum: [applied, phone_screen, technical_assessment, interview, final_round,
+             offer, rejected, withdrawn, accepted]
+
+    NewApplication:
+      type: object
+      required: [company, role, source, date_applied]
+      properties:
+        company: { type: string }
+        role: { type: string }
+        source: { $ref: "#/components/schemas/Source" }
+        date_applied: { type: string, format: date }
+        salary_range_min: { type: integer, nullable: true }
+        salary_range_max: { type: integer, nullable: true }
+
+    Application:
+      type: object
+      required: [id, company, role, source, date_applied, current_stage, status,
+                 salary_range_min, salary_range_max, stage_entered_at, stage_entered_on,
+                 days_in_stage, stale]
+      properties:
+        id: { type: integer }
+        company: { type: string }
+        role: { type: string }
+        source: { $ref: "#/components/schemas/Source" }
+        date_applied: { type: string, format: date }
+        current_stage: { $ref: "#/components/schemas/Stage" }
+        status: { type: string, enum: [active, rejected, withdrawn, accepted] }
+        salary_range_min: { type: integer, nullable: true }
+        salary_range_max: { type: integer, nullable: true }
+        stage_entered_at: { type: string, format: date-time, description: When it entered its current stage }
+        stage_entered_on: { type: string, format: date }
+        days_in_stage: { type: integer }
+        stale: { type: boolean, description: Active and no stage change for more than STALE_DAYS }
+
+    StageHistoryEntry:
+      type: object
+      required: [stage, entered_at]
+      properties:
+        stage: { $ref: "#/components/schemas/Stage" }
+        entered_at: { type: string, format: date-time }
+
+    ApplicationDetail:
+      type: object
+      required: [application, history, next_stages, stage_order]
+      properties:
+        application: { $ref: "#/components/schemas/Application" }
+        history:
+          type: array
+          items: { $ref: "#/components/schemas/StageHistoryEntry" }
+        next_stages:
+          type: array
+          description: Stages this application may move to next
+          items: { $ref: "#/components/schemas/Stage" }
+        stage_order:
+          type: object
+          description: Position of each active stage (applied = 1 ... offer = 6)
+          additionalProperties: { type: integer }
+
+    ConversionRate:
+      type: object
+      required: [from_stage, to_stage, reached, advanced, rate]
+      properties:
+        from_stage: { $ref: "#/components/schemas/Stage" }
+        to_stage: { $ref: "#/components/schemas/Stage" }
+        reached: { type: integer }
+        advanced: { type: integer }
+        rate:
+          type: number
+          nullable: true
+          description: advanced / reached, or null when no application reached from_stage

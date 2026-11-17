@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Required skills · Job Search Tracker</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="index.html">Job Search Tracker</a>
+      <nav>
+        <a href="index.html" class="active">Applications</a>
+        <a href="skills.html">Skills</a>
+        <a href="gap.html">Skill gap</a>
+      </nav>
+    </div>
+  </header>
+  <main class="container">
+    <div id="messages"></div>
+
+    <div class="page-header">
+      <div>
+        <h1 id="title">Required skills</h1>
+        <p class="muted" id="subtitle"></p>
+      </div>
+      <a class="btn btn-outline" id="back">← Back to application</a>
+    </div>
+
+    <section class="card">
+      <h2>Required skills</h2>
+      <div id="tagged"><p class="muted">Loading…</p></div>
+    </section>
+
+    <section class="card">
+      <h2>Add a skill</h2>
+      <div id="add"></div>
+    </section>
+  </main>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+  <script>
+    const id = queryId();
+    document.getElementById("back").href = `application.html?id=${id}`;
+
+    // Header from PIPELINE, tags from SKILLS, loaded separately: if pipeline is down,
+    // the tags still show and only the header says it is unavailable.
+    async function loadHeader() {
+      try {
+        const { application } = await api("PIPELINE_URL", `/applications/${id}`);
+        document.getElementById("title").textContent = `Skills for ${application.company}`;
+        document.getElementById("subtitle").textContent = application.role;
+      } catch (error) {
+        document.getElementById("subtitle").textContent =
+          error.status === 404 ? "Application not found." : "Application details unavailable.";
+      }
+    }
+
+    async function change(action) {
+      try {
+        await action();
+        await loadTags();
+      } catch (error) {
+        showMessage(error.message, "error");   // e.g. 503 when pipeline can't confirm the application
+      }
+    }
+
+    function renderTags({ tagged, available }) {
+      document.getElementById("tagged").replaceChildren(tagged.length === 0
+        ? el("p", {}, "No skills tagged yet.")
+        : el("ul", { class: "chips" }, tagged.map((s) =>
+            el("li", {}, s.name, s.archived && el("span", { class: "muted" }, " (archived)"), " ",
+              el("button", { class: "btn-ghost-danger btn-sm",
+                             onclick: () => change(() => send("SKILLS_URL", `/applications/${id}/skills/${s.id}`, "DELETE")) },
+                 "Remove")))));
+
+      if (available.length === 0) {
+        document.getElementById("add").replaceChildren(el("p", { class: "muted" },
+          "No more skills to add. ", el("a", { href: "skills.html" }, "Create one on the Skills page"), "."));
+        return;
+      }
+      const select = el("select", { name: "skill_id" }, available.map((s) => el("option", { value: s.id }, s.name)));
+      const form = el("form", { class: "form-row" }, el("label", {}, "Skill ", select),
+                      el("button", { type: "submit" }, "Add"));
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        change(() => send("SKILLS_URL", `/applications/${id}/skills`, "POST", { skill_id: Number(select.value) }));
+      });
+      document.getElementById("add").replaceChildren(form);
+    }
+
+    async function loadTags() {
+      try {
+        renderTags(await api("SKILLS_URL", `/applications/${id}/skills`));
+      } catch (error) {
+        document.getElementById("tagged").replaceChildren();
+        showMessage(error.message, "error");
+      }
+    }
+
+    loadHeader();
+    loadTags();
+  </script>
+</body>
+</html>

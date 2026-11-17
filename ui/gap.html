@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Skill gap · Job Search Tracker</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="index.html">Job Search Tracker</a>
+      <nav>
+        <a href="index.html">Applications</a>
+        <a href="skills.html">Skills</a>
+        <a href="gap.html" class="active">Skill gap</a>
+      </nav>
+    </div>
+  </header>
+  <main class="container">
+    <div id="messages"></div>
+
+    <div class="page-header">
+      <div>
+        <h1>Skill gap</h1>
+        <p class="muted">Only active applications count. Rejected or withdrawn ones drop out automatically.</p>
+      </div>
+    </div>
+
+    <section class="card">
+      <h2>What to work on first</h2>
+      <div id="priorities"><p class="muted">Loading…</p></div>
+    </section>
+
+    <section class="card">
+      <h2>Missing skills by demand</h2>
+      <div id="missing"></div>
+    </section>
+  </main>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+  <script>
+    function renderPriorities(priorities) {
+      if (priorities.length === 0) {
+        return el("p", {}, "Nothing to show yet. Tag skills on your active applications.");
+      }
+      const topScore = priorities[0].score;   // already sorted, highest first
+      return [
+        el("div", { class: "table-wrap" }, el("table", {},
+          el("thead", {}, el("tr", {}, ["#", "Skill", "Wanted by", "My level", "Gap", "Score"].map((h) => el("th", {}, h)))),
+          el("tbody", {}, priorities.map((p, i) => el("tr", {},
+            el("td", { class: "muted" }, i + 1),
+            el("td", {}, el("strong", {}, p.name)),
+            el("td", {}, `${p.demand} application${p.demand === 1 ? "" : "s"}`),
+            el("td", {}, p.proficiency || "—"),
+            el("td", {}, p.gap),
+            el("td", {}, el("div", { class: "bar-cell" },
+              el("div", { class: "bar" }, el("span", { style: `width: ${Math.round(p.score / topScore * 100)}%` })),
+              el("strong", {}, p.score)))))))),
+        el("p", { class: "muted" },
+           "Score = applications wanting the skill × (5 − my level). A skill I don't have counts as level 0."),
+      ];
+    }
+
+    function renderMissing(missing) {
+      if (missing.length === 0) {
+        return el("p", { class: "muted" }, "No missing skills: you have every skill your active applications ask for.");
+      }
+      return el("ul", { class: "chips" }, missing.map((m) =>
+        el("li", { style: "padding-right: 4px" }, m.name, " ", el("span", { class: "badge" }, m.demand))));
+    }
+
+    api("SKILLS_URL", "/skills/gap").then((data) => {
+      if (!data.pipeline_available) {
+        // Degraded mode: skills answered, but pipeline didn't, so nothing can be ranked.
+        showMessage(data.notice, "error");
+        document.getElementById("priorities").replaceChildren(el("p", { class: "muted" }, "Ranking unavailable."));
+        return;
+      }
+      document.getElementById("priorities").replaceChildren(...[renderPriorities(data.priorities)].flat());
+      document.getElementById("missing").replaceChildren(renderMissing(data.missing));
+    }).catch((error) => {
+      document.getElementById("priorities").replaceChildren();
+      showMessage(error.message, "error");
+    });
+  </script>
+</body>
+</html>

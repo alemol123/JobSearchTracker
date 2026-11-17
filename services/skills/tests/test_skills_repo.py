@@ -4,12 +4,8 @@ from skills import repository as repo
 
 
 def _application(conn, app_id):
-    """application_skills references applications(id), so tests need a row to tag."""
-    conn.execute(
-        """INSERT INTO applications (id, company, role, source, date_applied)
-           VALUES (?, 'Acme', 'Dev', 'referral', '2026-10-01')""",
-        (app_id,),
-    )
+    """After the split application_id is a plain number with no foreign key (ADR-6),
+    so any ID can be tagged here; the routes check it exists by asking pipeline."""
     return app_id
 
 
@@ -58,7 +54,7 @@ def test_adding_an_archived_skill_again_restores_it(conn):
 
 def test_archive_missing_skill_raises_lookup_error(conn):
     with pytest.raises(LookupError):
-        repo.archive_skill(conn, 999)
+        repo.archive_skill(conn, 999999)
 
 
 # ---------- my_skills: proficiency ----------
@@ -126,7 +122,7 @@ def test_tagging_a_missing_skill_raises_lookup_error(conn):
     app_id = _application(conn, 1)
 
     with pytest.raises(LookupError):
-        repo.tag_application(conn, app_id, 999)
+        repo.tag_application(conn, app_id, 999999)
 
 
 def test_archiving_keeps_existing_tags_and_proficiency(conn):
@@ -140,7 +136,7 @@ def test_archiving_keeps_existing_tags_and_proficiency(conn):
 
     assert repo.get_tags(conn) == [(app_id, perl)]
     assert repo.get_my_skills(conn) == {perl: 2}
-    assert repo.get_skills_for_application(conn, app_id)[0]["archived"] == 1
+    assert repo.get_skills_for_application(conn, app_id)[0]["archived"] is True   # BIT -> bool
 
 
 def test_skill_names_include_archived_skills(conn):
@@ -153,4 +149,4 @@ def test_skill_names_include_archived_skills(conn):
 
 def test_set_proficiency_on_missing_skill_raises_lookup_error(conn):
     with pytest.raises(LookupError):
-        repo.set_proficiency(conn, 999, 3)
+        repo.set_proficiency(conn, 999999, 3)

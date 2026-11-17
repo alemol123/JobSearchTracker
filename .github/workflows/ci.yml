@@ -7,6 +7,18 @@ jobs:
     strategy:
       matrix:
         service: [pipeline, skills]
+    # A throwaway SQL Server next to the job: tests never touch Azure SQL.
+    services:
+      sqlserver:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env: { ACCEPT_EULA: "Y", MSSQL_SA_PASSWORD: "Ci_Only_Passw0rd!" }   # CI-only container, not a secret
+        ports: ["1433:1433"]
+        options: >-
+          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'Ci_Only_Passw0rd!' -C -Q 'SELECT 1'"
+          --health-interval 10s --health-retries 20 --health-start-period 20s
+    env:
+      # conftest.py creates this database if missing and runs the migrations on it.
+      TEST_DATABASE_URL: mssql://sa:Ci_Only_Passw0rd!@localhost:1433/${{ matrix.service }}_test
     defaults:
       run:
         working-directory: services/${{ matrix.service }}
@@ -16,10 +28,20 @@ jobs:
         with: { python-version: "3.12" }
       - run: pip install -r requirements.txt -r requirements-dev.txt
       - run: ruff check .
-      # pytest against a SQL Server container is added once the tests are ported (Day 3)
+      - run: pytest --cov=${{ matrix.service }} --cov-report=term-missing --cov-fail-under=70
+
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install openapi-spec-validator==0.7.1 check-jsonschema==0.29.4
+      - run: openapi-spec-validator services/pipeline/openapi.yaml services/skills/openapi.yaml
+      # system.yaml check is added together with system.schema.json and system.yaml
 
   images:
-    needs: test                       # no image from a commit that failed lint/tests
+    needs: [test, validate]           # no image from a commit that failed lint/tests/validation
     runs-on: ubuntu-latest
     permissions:
       contents: read

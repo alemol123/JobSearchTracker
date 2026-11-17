@@ -52,5 +52,12 @@ services:
       GIT_SHA: local
     ports: ["8002:8000"]
 
+  # The static UI: plain HTML/JS files served as they are. The browser calls the
+  # services directly on 8001/8002 (URLs in ui/config.js), so CORS allows this origin.
+  ui:
+    image: nginx:alpine
+    volumes: ["./ui:/usr/share/nginx/html:ro"]
+    ports: ["8080:80"]
+
 volumes:
   mssql-data:

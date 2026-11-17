@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Application · Job Search Tracker</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="index.html">Job Search Tracker</a>
+      <nav>
+        <a href="index.html" class="active">Applications</a>
+        <a href="skills.html">Skills</a>
+        <a href="gap.html">Skill gap</a>
+      </nav>
+    </div>
+  </header>
+  <main class="container">
+    <div id="messages"></div>
+    <div id="page"><p class="muted">Loading…</p></div>
+  </main>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+  <script>
+    const id = queryId();
+    // Closing states get a hint so their meaning is clear.
+    const HINTS = { accepted: " — I took the offer", withdrawn: " — I pulled out / declined",
+                    rejected: " — the company said no" };
+
+    function stepper(application, history, stageOrder) {
+      // Active stages in order. Stages passed by a forward skip show as dashed ("skipped").
+      const reached = new Set(history.map((h) => h.stage));
+      const currentNumber = stageOrder[application.current_stage] || 0;
+      const stages = Object.entries(stageOrder).sort((a, b) => a[1] - b[1]);  // JSON keys come back sorted by name
+      return el("ol", { class: "stepper" }, stages.map(([stage, number]) => {
+        let state = "";
+        if (stage === application.current_stage) state = "current";
+        else if (reached.has(stage)) state = "done";
+        else if (number < currentNumber) state = "skipped";
+        return el("li", { class: state }, label(stage));
+      }));
+    }
+
+    function moveForm(nextStages) {
+      if (nextStages.length === 0) {
+        return el("p", { class: "muted" }, "This application is closed and can't move any more.");
+      }
+      const select = el("select", { name: "stage" },
+        nextStages.map((s) => el("option", { value: s }, label(s) + (HINTS[s] || ""))));
+      const form = el("form", { class: "form-row" }, el("label", {}, "New stage ", select),
+                      el("button", { type: "submit" }, "Move"));
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        try {
+          await send("PIPELINE_URL", `/applications/${id}/stage`, "POST", { stage: select.value });
+          await load();
+          showMessage("Stage updated.");
+        } catch (error) {
+          showMessage(error.message, "error");
+        }
+      });
+      return el("div", {}, form, el("p", { class: "muted" },
+        "Only allowed moves are listed: forward (skips are fine), rejected or withdrawn at any time, " +
+        "and accepted once there's an offer."));
+    }
+
+    function render({ application: a, history, next_stages, stage_order }) {
+      document.title = `${a.company} · Job Search Tracker`;
+      const details = [
+        ["Days in stage", [a.days_in_stage, " ", a.stale && el("span", { class: "badge badge-warning" }, "stale")]],
+        ["Status", el("span", { class: "badge badge-outline" }, a.status)],
+        ["Source", label(a.source)],
+        ["Applied", a.date_applied],
+      ];
+      if (a.salary_range_min !== null || a.salary_range_max !== null) {
+        details.push(["Salary range", `${a.salary_range_min ?? "?"} – ${a.salary_range_max ?? "?"}`]);
+      }
+      document.getElementById("page").replaceChildren(
+        el("div", { class: "page-header" },
+          el("div", {}, el("h1", {}, a.company), el("p", { class: "muted" }, a.role)),
+          el("a", { class: "btn btn-outline", href: `application-skills.html?id=${a.id}` }, "Required skills →")),
+        el("section", { class: "card" }, stepper(a, history, stage_order)),
+        el("div", { class: "card-grid" },
+          el("section", { class: "card" },
+            el("h2", {}, "Overview"),
+            el("p", {}, "Current stage: ", el("strong", {}, a.current_stage)),
+            el("dl", { class: "details" }, details.map(([term, value]) => [el("dt", {}, term), el("dd", {}, value)]))),
+          el("section", { class: "card" }, el("h2", {}, "Move to stage"), moveForm(next_stages))),
+        el("section", { class: "card" },
+          el("h2", {}, "Stage history"),
+          el("ol", { class: "timeline" }, history.map((h) =>
+            el("li", {}, stageBadge(h.stage), " ", el("span", { class: "muted" }, h.entered_at.replace("T", " ")))))));
+    }
+
+    async function load() {
+      try {
+        render(await api("PIPELINE_URL", `/applications/${id}`));
+      } catch (error) {
+        document.getElementById("page").replaceChildren();
+        showMessage(error.message, "error");
+      }
+    }
+
+    load();
+  </script>
+</body>
+</html>

@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Skills · Job Search Tracker</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="index.html">Job Search Tracker</a>
+      <nav>
+        <a href="index.html">Applications</a>
+        <a href="skills.html" class="active">Skills</a>
+        <a href="gap.html">Skill gap</a>
+      </nav>
+    </div>
+  </header>
+  <main class="container">
+    <div id="messages"></div>
+
+    <div class="page-header">
+      <div>
+        <h1>Skills</h1>
+        <p class="muted">Skills your applications ask for, and your own level in each.</p>
+      </div>
+    </div>
+
+    <section class="card">
+      <h2>Add a skill</h2>
+      <form id="add-form" class="form-row">
+        <label>Name <input name="name" required maxlength="50"></label>
+        <label>Category (optional) <input name="category" placeholder="language, tool, soft skill…"></label>
+        <button type="submit">Add skill</button>
+      </form>
+    </section>
+
+    <section class="card" id="skills"><p class="muted">Loading…</p></section>
+    <div id="archived"></div>
+  </main>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+  <script>
+    // Run a change, reload the list, then show the result.
+    async function change(action, successMessage) {
+      try {
+        await action();
+        await load();
+        showMessage(successMessage);
+      } catch (error) {
+        showMessage(error.body?.errors || error.message, "error");
+      }
+    }
+
+    function levelForm(skill, maxLevel) {
+      const select = el("select", { name: "level" },
+        el("option", { value: "", selected: skill.proficiency_level === null }, "I don't have it"),
+        Array.from({ length: maxLevel }, (_, i) => i + 1).map((level) =>
+          el("option", { value: level, selected: skill.proficiency_level === level }, level)));
+      const form = el("form", { class: "inline" }, select,
+                      el("button", { type: "submit", class: "btn-outline btn-sm" }, "Save"));
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        change(() => send("SKILLS_URL", `/skills/${skill.id}/proficiency`, "PUT", { level: select.value }),
+               select.value ? "Proficiency saved." : "Removed from my skills.");
+      });
+      return form;
+    }
+
+    function render({ skills, max_level }) {
+      const active = skills.filter((s) => !s.archived);
+      const archived = skills.filter((s) => s.archived);
+
+      document.getElementById("skills").replaceChildren(active.length === 0
+        ? el("p", {}, "No skills yet. Add the skills your job applications ask for.")
+        : el("div", { class: "table-wrap" }, el("table", {},
+            el("thead", {}, el("tr", {}, el("th", {}, "Skill"), el("th", {}, "Category"),
+                                       el("th", {}, `My level (1–${max_level})`), el("th", {}))),
+            el("tbody", {}, active.map((s) => el("tr", {},
+              el("td", {}, el("strong", {}, s.name)),
+              el("td", {}, s.category ? el("span", { class: "badge badge-outline" }, s.category)
+                                      : el("span", { class: "muted" }, "—")),
+              el("td", {}, levelForm(s, max_level)),
+              el("td", {}, el("button", {
+                class: "btn-ghost-danger btn-sm",
+                onclick: () => change(() => send("SKILLS_URL", `/skills/${s.id}/archive`, "POST"),
+                                      "Skill archived. Existing tags are kept, but it can't be added to new applications."),
+              }, "Archive"))))))));
+
+      document.getElementById("archived").replaceChildren(archived.length === 0 ? "" :
+        el("section", { class: "card" },
+          el("h2", {}, "Archived"),
+          el("p", { class: "muted" }, "Hidden from new tagging; kept on applications that already had them. " +
+                                      "Add the same name again to restore one."),
+          el("ul", { class: "chips" }, archived.map((s) => el("li", { style: "padding-right: 12px" }, s.name)))));
+    }
+
+    async function load() {
+      render(await api("SKILLS_URL", "/skills"));
+    }
+
+    const form = document.getElementById("add-form");
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      change(async () => { await send("SKILLS_URL", "/skills", "POST", formData(form)); form.reset(); },
+             "Skill added.");
+    });
+
+    load().catch((error) => {
+      document.getElementById("skills").replaceChildren();
+      showMessage(error.message, "error");
+    });
+  </script>
+</body>
+</html>
