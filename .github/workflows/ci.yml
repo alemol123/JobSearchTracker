@@ -38,7 +38,7 @@ jobs:
         with: { python-version: "3.12" }
       - run: pip install openapi-spec-validator==0.7.1 check-jsonschema==0.29.4
       - run: openapi-spec-validator services/pipeline/openapi.yaml services/skills/openapi.yaml
-      # system.yaml check is added together with system.schema.json and system.yaml
+      - run: check-jsonschema --schemafile system.schema.json system.yaml
 
   images:
     needs: [test, validate]           # no image from a commit that failed lint/tests/validation
