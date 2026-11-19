@@ -71,6 +71,9 @@ def parse_skill_form(form):
         errors.append("Skill name is required.")
     elif len(name) > MAX_SKILL_NAME_LENGTH:
         errors.append(f"Skill name must be at most {MAX_SKILL_NAME_LENGTH} characters.")
+    # category is NVARCHAR(50) too: check it here so a long one is a 400, not a database error.
+    if category is not None and len(category) > MAX_SKILL_NAME_LENGTH:
+        errors.append(f"Category must be at most {MAX_SKILL_NAME_LENGTH} characters.")
     return {"name": name, "category": category}, errors
 
 

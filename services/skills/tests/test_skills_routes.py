@@ -96,6 +96,25 @@ def test_tagging_unknown_or_archived_skill_is_400(client):
     assert unknown.status_code == 400 and "not found" in unknown.get_json()["error"]
     assert archived.status_code == 400 and "archived" in archived.get_json()["error"]
     assert not_a_number.status_code == 400
+    assert not_a_number.get_json()["error"] == "skill_id must be a whole number."
+
+
+@responses.activate
+def test_json_that_is_not_an_object_is_a_400_not_a_crash(client):
+    responses.get(f"{PIPELINE}/applications/1", json={"application": {"id": 1}})
+    skill = _add_skill(client, "Go")
+
+    assert client.post("/skills", json=[1]).status_code == 400
+    assert client.put(f"/skills/{skill}/proficiency", json=[1]).status_code == 400
+    no_skill = client.post("/applications/1/skills", json="text")
+    assert no_skill.status_code == 400
+    assert no_skill.get_json()["error"] == "skill_id is required."
+
+
+def test_too_long_category_is_a_400_not_a_crash(client):
+    response = client.post("/skills", json={"name": "Rust", "category": "c" * 51})
+
+    assert response.status_code == 400
 
 
 def test_tags_of_an_application_do_not_need_pipeline(client):

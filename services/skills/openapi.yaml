@@ -88,13 +88,14 @@ paths:
           application/json:
             schema:
               type: object
+              required: [level]
               properties:
                 level:
                   type: integer
                   minimum: 1
                   maximum: 5
                   nullable: true
-                  description: null (or "") means I don't have this skill
+                  description: null (or "") means I don't have this skill; the field itself is required
       responses:
         "200":
           description: Saved
@@ -102,7 +103,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Ok" }
         "400":
-          description: Level is not a whole number between 1 and 5
+          description: Level missing, or not a whole number between 1 and 5
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }

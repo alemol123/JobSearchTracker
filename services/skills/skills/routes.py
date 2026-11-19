@@ -17,6 +17,13 @@ bp = Blueprint("skills", __name__, url_prefix="/skills")
 app_bp = Blueprint("application_skills", __name__, url_prefix="/applications")
 
 
+def _json_body():
+    """The request body as a dict. Anything else (no body, not JSON, a list, a string)
+    becomes {}, so the normal validation answers 400 instead of the code crashing (500)."""
+    body = request.get_json(silent=True)
+    return body if isinstance(body, dict) else {}
+
+
 def _text(value):
     """logic expects form-like strings: turn numbers and null into text."""
     return "" if value is None else str(value)
@@ -31,7 +38,7 @@ def list_skills():
 
 @bp.post("")
 def add():
-    body = request.get_json(silent=True) or {}
+    body = _json_body()
     data, errors = logic.parse_skill_form({k: _text(v) for k, v in body.items()})
     if errors:
         return jsonify(errors=errors), 400
@@ -44,7 +51,11 @@ def add():
 
 @bp.put("/<int:skill_id>/proficiency")
 def set_proficiency(skill_id):
-    body = request.get_json(silent=True) or {}
+    body = _json_body()
+    # A blank level removes my level, so a body without the field must not count as "blank":
+    # a malformed request would otherwise delete data.
+    if "level" not in body:
+        return jsonify(error='Send {"level": 1-5}, or {"level": null} to remove it.'), 400
     level, error = logic.parse_proficiency(_text(body.get("level")))
     if error:
         return jsonify(error=error), 400
@@ -108,10 +119,16 @@ def tag(app_id):
     except pipeline_client.PipelineUnavailable as error:
         current_app.logger.warning("pipeline unavailable for tagging: %s", error)
         return jsonify(error="Can't check the application right now. Try again in a minute."), 503
-    body = request.get_json(silent=True) or {}
+    body = _json_body()
+    if "skill_id" not in body:
+        return jsonify(error="skill_id is required."), 400
     try:
-        repo.tag_application(get_db(), app_id, int(body.get("skill_id", 0)))
-    except (LookupError, ValueError, TypeError) as error:
+        skill_id = int(body["skill_id"])
+    except (ValueError, TypeError):      # "abc", 3.5 is fine (int() cuts it), None, a list ...
+        return jsonify(error="skill_id must be a whole number."), 400
+    try:
+        repo.tag_application(get_db(), app_id, skill_id)
+    except (LookupError, ValueError) as error:   # skill not found / archived
         return jsonify(error=str(error)), 400
     return jsonify(ok=True), 201
 

@@ -171,6 +171,12 @@ def test_skill_form_rejects_very_long_names():
     assert any("50 characters" in e for e in errors)
 
 
+def test_skill_form_rejects_very_long_categories():
+    _, errors = parse_skill_form({"name": "Docker", "category": "c" * 51})
+
+    assert errors == ["Category must be at most 50 characters."]
+
+
 # ---------- parse_proficiency ----------
 
 @pytest.mark.parametrize("text, level", [("1", 1), ("5", 5), (" 3 ", 3)])
