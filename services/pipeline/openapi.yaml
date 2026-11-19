@@ -211,8 +211,8 @@ components:
     Application:
       type: object
       required: [id, company, role, source, date_applied, current_stage, status,
-                 salary_range_min, salary_range_max, stage_entered_at, stage_entered_on,
-                 days_in_stage, stale]
+                 salary_range_min, salary_range_max, last_stage_change, stage_entered_at,
+                 stage_entered_on, days_in_stage, stale]
       properties:
         id: { type: integer }
         company: { type: string }
@@ -223,7 +223,11 @@ components:
         status: { type: string, enum: [active, rejected, withdrawn, accepted] }
         salary_range_min: { type: integer, nullable: true }
         salary_range_max: { type: integer, nullable: true }
-        stage_entered_at: { type: string, format: date-time, description: When it entered its current stage }
+        last_stage_change:
+          type: string
+          format: date-time
+          description: When it last changed stage (stored column, added by migration 002)
+        stage_entered_at: { type: string, format: date-time, description: When it entered its current stage (same value as last_stage_change) }
         stage_entered_on: { type: string, format: date }
         days_in_stage: { type: integer }
         stale: { type: boolean, description: Active and no stage change for more than STALE_DAYS }

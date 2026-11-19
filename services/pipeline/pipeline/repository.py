@@ -8,12 +8,10 @@ from datetime import datetime
 
 from pipeline.logic import status_for_stage, validate_transition
 
-# Each application row plus the time it entered its current stage
-# (the newest stage_history row for that application).
+# Each application row plus the time it entered its current stage. Since migration 002
+# that time is stored in applications.last_stage_change, so no subquery per row is needed.
 _SELECT_APPLICATIONS = """
-    SELECT a.*,
-           (SELECT MAX(h.entered_at) FROM stage_history h
-             WHERE h.application_id = a.id) AS stage_entered_at
+    SELECT a.*, a.last_stage_change AS stage_entered_at
       FROM applications a
 """
 
@@ -28,18 +26,19 @@ def _to_dict(row):
 def create_application(conn, data):
     """Insert a new application in stage 'applied' and record that in stage_history."""
     cur = conn.cursor()
+    # It entered 'applied' on the day it was applied for, not the day it was typed in.
+    entered_at = datetime.combine(data["date_applied"], datetime.min.time())
     # OUTPUT INSERTED.id returns the new IDENTITY value as a result row (SQL Server has no lastrowid).
     cur.execute(
         """INSERT INTO applications
-               (company, role, source, date_applied, salary_range_min, salary_range_max)
+               (company, role, source, date_applied, salary_range_min, salary_range_max,
+                last_stage_change)
            OUTPUT INSERTED.id
-           VALUES (%s, %s, %s, %s, %s, %s)""",
+           VALUES (%s, %s, %s, %s, %s, %s, %s)""",
         (data["company"], data["role"], data["source"], data["date_applied"],
-         data["salary_range_min"], data["salary_range_max"]),
+         data["salary_range_min"], data["salary_range_max"], entered_at),
     )
     app_id = cur.fetchone()["id"]
-    # It entered 'applied' on the day it was applied for, not the day it was typed in.
-    entered_at = datetime.combine(data["date_applied"], datetime.min.time())
     cur.execute(
         "INSERT INTO stage_history (application_id, stage, entered_at) VALUES (%s, 'applied', %s)",
         (app_id, entered_at),
@@ -86,8 +85,9 @@ def change_stage(conn, app_id, new_stage, now=None):
         (app_id, new_stage, now),
     )
     cur.execute(
-        "UPDATE applications SET current_stage = %s, status = %s WHERE id = %s",
-        (new_stage, status_for_stage(new_stage), app_id),
+        """UPDATE applications SET current_stage = %s, status = %s, last_stage_change = %s
+            WHERE id = %s""",
+        (new_stage, status_for_stage(new_stage), now, app_id),
     )
     conn.commit()   # history row and current_stage change together (ADR-3)
 

@@ -38,6 +38,15 @@ def test_create_application_writes_first_history_row_on_date_applied(conn):
     assert history[0]["entered_at"] == datetime(2026, 9, 15, 0, 0)   # DATETIME2 -> Python datetime
 
 
+def test_create_application_sets_last_stage_change_to_date_applied(conn):
+    app_id = _new_app(conn, applied=date(2026, 9, 15))
+
+    app = repo.get_application(conn, app_id)
+
+    assert app["last_stage_change"] == datetime(2026, 9, 15, 0, 0)    # column from migration 002
+    assert app["stage_entered_at"] == app["last_stage_change"]
+
+
 def test_get_application_returns_none_for_missing_id(conn):
     assert repo.get_application(conn, 999999) is None
 
@@ -66,6 +75,17 @@ def test_change_stage_forward_updates_stage_and_appends_history(conn):
     assert app["current_stage"] == "interview"
     assert app["stage_entered_on"] == date(2026, 10, 5)
     assert [h["stage"] for h in history] == ["applied", "interview"]
+
+
+def test_change_stage_moves_last_stage_change_to_the_change_time(conn):
+    app_id = _new_app(conn, applied=date(2026, 10, 1))
+
+    repo.change_stage(conn, app_id, "phone_screen", now=datetime(2026, 10, 8, 14, 0, 59))
+
+    app = repo.get_application(conn, app_id)
+    assert app["last_stage_change"] == datetime(2026, 10, 8, 14, 0, 59)
+    # It matches the newest history row, which is what migration 002 backfilled from.
+    assert app["last_stage_change"] == repo.get_stage_history(conn, app_id)[-1]["entered_at"]
 
 
 def test_change_stage_backwards_raises_and_writes_nothing(conn):
