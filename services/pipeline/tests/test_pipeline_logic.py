@@ -221,6 +221,24 @@ def test_invalid_field_reports_an_error(field, value, message):
     assert any(message in e for e in errors)
 
 
+@pytest.mark.parametrize("field, value, message", [
+    ("company", "x" * 201, "Company must be at most 200"),
+    ("role", "x" * 201, "Role must be at most 200"),
+    ("salary_range_max", "2147483648", "too large"),       # one more than SQL Server's INT allows
+])
+def test_values_the_database_columns_cant_hold_are_errors(field, value, message):
+    _, errors = parse_application_form(_form(**{field: value}))
+
+    assert any(message in e for e in errors)
+
+
+def test_limits_themselves_are_accepted():
+    _, errors = parse_application_form(_form(company="x" * 200, salary_range_min="1",
+                                             salary_range_max="2147483647"))
+
+    assert errors == []
+
+
 def test_min_salary_above_max_is_an_error():
     _, errors = parse_application_form(_form(salary_range_min="60000", salary_range_max="50000"))
 

@@ -4,6 +4,8 @@ test_pipeline_logic.py; these check status codes and the shape of the JSON.
 IDs come from the responses: SQL Server keeps counting IDENTITY values after a
 DELETE, so the first application of a test is not always id 1."""
 
+import pytest
+
 VALID = {
     "company": "Acme",
     "role": "Backend Developer",
@@ -54,6 +56,24 @@ def test_invalid_application_returns_all_errors(client):
 
 def test_missing_body_is_a_400_not_a_crash(client):
     assert client.post("/applications", data="not json").status_code == 400
+
+
+@pytest.mark.parametrize("body", [[1, 2], "text", 42])
+def test_json_that_is_not_an_object_is_a_400_not_a_crash(client, body):
+    app_id = _create(client)
+
+    assert client.post("/applications", json=body).status_code == 400
+    stage = client.post(f"/applications/{app_id}/stage", json=body)
+    assert stage.status_code == 400
+    assert stage.get_json()["error"] == "stage is required."
+
+
+def test_values_too_big_for_the_database_are_a_400_not_a_crash(client):
+    response = client.post("/applications", json={**VALID, "company": "x" * 201,
+                                                   "salary_range_min": 99999999999})
+
+    assert response.status_code == 400
+    assert len(response.get_json()["errors"]) == 2
 
 
 def test_detail_has_history_and_allowed_next_stages(client):
