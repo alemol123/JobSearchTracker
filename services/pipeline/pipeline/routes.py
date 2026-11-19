@@ -17,6 +17,13 @@ def _json_ready(row):
             for key, value in row.items()}
 
 
+def _json_body():
+    """The request body as a dict. Anything else (no body, not JSON, a list, a string)
+    becomes {}, so the normal validation answers 400 instead of the code crashing (500)."""
+    body = request.get_json(silent=True)
+    return body if isinstance(body, dict) else {}
+
+
 def _as_form(body):
     """logic.parse_application_form expects form-like strings: turn numbers and null into text."""
     return {key: "" if value is None else str(value) for key, value in body.items()}
@@ -42,7 +49,7 @@ def list_applications():
 
 @bp.post("")
 def create():
-    data, errors = logic.parse_application_form(_as_form(request.get_json(silent=True) or {}))
+    data, errors = logic.parse_application_form(_as_form(_json_body()))
     if errors:
         return jsonify(errors=errors), 400
     app_id = repo.create_application(get_db(), data)
@@ -79,9 +86,11 @@ def detail(app_id):
 
 @bp.post("/<int:app_id>/stage")
 def change_stage(app_id):
-    body = request.get_json(silent=True) or {}
+    body = _json_body()
+    if not body.get("stage"):
+        return jsonify(error="stage is required."), 400
     try:
-        repo.change_stage(get_db(), app_id, body.get("stage", ""))
+        repo.change_stage(get_db(), app_id, body["stage"])
     except LookupError:
         return jsonify(error="Application not found"), 404
     except logic.InvalidTransition as error:

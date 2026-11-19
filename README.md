@@ -147,7 +147,7 @@ Migration 002 on Azure (evidence in `evidence/`): data captured before (`before_
 branch → pull request → CI ──(merge)──> CI on main ──(passed)──> CD
 ```
 
-- **CI** (`.github/workflows/ci.yml`, every push and pull request): for each service, install pinned dependencies, `ruff`, `pytest` with coverage ≥ 70% against a SQL Server service container; validate both OpenAPI documents; build both Docker images. On `main` only, push the images to GHCR as `ghcr.io/alemol123/jst-<service>:<commit sha>`.
+- **CI** (`.github/workflows/ci.yml`, every push and pull request): for each service, install pinned dependencies, `ruff`, `pytest` with coverage ≥ 70% against a SQL Server service container; validate both OpenAPI documents and `system.yaml` against `system.schema.json`; build both Docker images. On `main` only, push the images to GHCR as `ghcr.io/alemol123/jst-<service>:<commit sha>`.
 - **CD** (`.github/workflows/cd.yml`, after CI succeeds on a push to `main`):
   1. Sign in to Azure through OpenID Connect as the managed identity (no password stored).
   2. Create or update both Container Apps with the images CI built for that exact commit: min 0 / max 1 replicas, `DATABASE_URL` from a Container Apps secret, `ALLOWED_ORIGIN` = the UI's URL, `GIT_SHA`.

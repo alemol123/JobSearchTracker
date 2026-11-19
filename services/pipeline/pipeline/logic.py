@@ -110,6 +110,12 @@ def conversion_rates_by_source(applications):
     return result
 
 
+# Limits of the database columns (migrations/001_init.sql). Checking them here means a too-long
+# or too-big value gets a 400 with a message instead of a database error (a 500).
+MAX_TEXT_LENGTH = 200           # company and role are NVARCHAR(200)
+MAX_SALARY = 2_147_483_647      # salaries are INT, whose largest value is 2^31 - 1
+
+
 def parse_application_form(form):
     """Turn the raw strings from the new-application form into typed values.
 
@@ -122,8 +128,12 @@ def parse_application_form(form):
     source = form.get("source", "")
     if not company:
         errors.append("Company is required.")
+    elif len(company) > MAX_TEXT_LENGTH:
+        errors.append(f"Company must be at most {MAX_TEXT_LENGTH} characters.")
     if not role:
         errors.append("Role is required.")
+    elif len(role) > MAX_TEXT_LENGTH:
+        errors.append(f"Role must be at most {MAX_TEXT_LENGTH} characters.")
     if source not in SOURCES:
         errors.append("Choose a valid source.")
 
@@ -156,5 +166,8 @@ def _parse_salary(text, label, errors):
         return None
     if not text.isdigit():
         errors.append(f"{label} must be a whole number.")
+        return None
+    if int(text) > MAX_SALARY:
+        errors.append(f"{label} is too large.")
         return None
     return int(text)
