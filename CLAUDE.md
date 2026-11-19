@@ -1,6 +1,6 @@
 # JobSearchTracker — Assignment 2
 
-The assignment brief is `notes/assignment_2.md` and the day-by-day plan is `notes/a2-guide.md`. Read both before starting work. Assignment 1 rules no longer apply.
+The assignment brief is `notes/assignment_2_updated.md` (it replaces `notes/assignment_2.md` wherever they differ) and the day-by-day plan is `notes/a2-guide.md` (its Azure steps are outdated: follow the brief and the "Azure" rule below). Read both before starting work. Assignment 1 rules no longer apply.
 
 ## What we are building
 Split the Assignment 1 Flask monolith into two services along the ADR-2 seam:
@@ -9,7 +9,7 @@ Split the Assignment 1 Flask monolith into two services along the ADR-2 seam:
 - Skills calls pipeline over HTTP (`PIPELINE_URL`, with a timeout from `PIPELINE_TIMEOUT_S`):
   - `GET /applications/active-ids` is used by `/skills/gap`. If pipeline is unavailable, return 200 with `pipeline_available: false` and a notice.
   - `GET /applications/{id}` is used when tagging. If pipeline is unavailable, fail closed with 503.
-- `ui/` is a static HTML/JS site that reads `window.CONFIG` from `config.js`. Locally it is served by `nginx:alpine` in compose; on Azure, by a Static Web App.
+- `ui/` is a static HTML/JS site that reads `window.CONFIG` from `config.js`. Locally it is served by `nginx:alpine` in compose; on Azure, by the storage static website `amolinsieu2024ui` (CD uploads `ui/` to its `$web` container).
 
 ## Stack
 Python 3.12, Flask, raw SQL with pymssql (`as_dict=True`, `%s` placeholders), no ORM, gunicorn with 1 worker.
@@ -21,7 +21,7 @@ SQL Server 2022 locally (compose); Azure SQL serverless in production.
 - Dockerfiles: `python:3.12-slim`, no `COPY . .`, pinned dependencies, non-root user. About 12 third-party packages per service at most.
 - No secrets in any committed file. Local compose passwords are throwaway defaults; Azure secrets are GitHub Actions secrets only.
 - Tests run against a local or CI SQL Server container, never Azure SQL. Coverage must be at least 70% per service.
-- Azure: at most 2 Container Apps, 2 databases, 1 Static Web App. All names start with `<prefix>` (my IE username with dots replaced by hyphens — still to fill in). Resource group is `rg-sdd-3a` or `rg-sdd-3b` (still to fill in). Never create extra Azure resources.
+- Azure (my own Azure for Students subscription): resource group `rg-amolins` in `germanywestcentral` (only germanywestcentral, polandcentral, austriaeast, spaincentral, switzerlandnorth are allowed). It holds exactly: Container Apps `amolins-ieu2024-pipeline` and `amolins-ieu2024-skills` in environment `amolins-ieu2024-env`; SQL server `amolins-ieu2024-sql` with `amolins-ieu2024-pipeline-db` and `amolins-ieu2024-skills-db` (serverless, free offer, contained users `pipeline_user`/`skills_user`); storage account `amolinsieu2024ui`; managed identity `amolins-ieu2024-github-id` (GitHub OIDC, Contributor on the RG). The RG and identity names differ from the brief's `rg-<prefix>` / `<prefix>-github` on purpose (ADR-8). Never create extra Azure resources.
 - Changes reach `main` only through pull requests.
 
 ## How to work with me
