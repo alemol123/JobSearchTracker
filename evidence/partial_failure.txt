@@ -1,0 +1,21 @@
+# Partial failure: pipeline stopped locally with 'docker compose stop pipeline' (2026-11-19 16:21 CET)
+
+$ curl -s -w " [HTTP %{http_code}, %{time_total}s]" localhost:8002/skills/gap
+{"missing":[],"notice":"The application pipeline is unavailable, so the skill gap can't be ranked right now. Your skills list still works.","pipeline_available":false,"priorities":[]}
+ [HTTP 200, 0.311774s]
+
+$ curl -s -w " [HTTP %{http_code}]" localhost:8002/skills        # skills keeps serving its own domain
+{"max_level":5,"skills":[{"archived":false,"category":"lang","id":1003,"name":"Python","proficiency_level":3},{"archived":false,"category":null,"id":1002,"name":"SQL","proficiency_level":null}]}
+ [HTTP 200]
+
+$ curl -s -w " [HTTP %{http_code}]" -X POST localhost:8002/applications/3/skills -H "Content-Type: application/json" -d "{\"skill_id\": 1}"   # tagging fails closed
+{"error":"Can't check the application right now. Try again in a minute."}
+ [HTTP 503]
+
+$ curl -s -w " [HTTP %{http_code}]" localhost:8002/health        # health reflects only its own database
+{"db":"ok","status":"ok","version":"local"}
+ [HTTP 200]
+
+$ docker compose logs skills | grep "pipeline unavailable"
+skills-1  | 2026-11-19 15:21:15,426 WARNING pipeline unavailable for /skills/gap: HTTPConnectionPool(host='pipeline', port=8000): Max retries exceeded with url: /applications/active-ids (Caused by NameResolutionError("HTTPConnection(host='pipeline', port=8000): Failed to resolve 'pipeline' ([Errno -2] Name or service not known)"))
+skills-1  | 2026-11-19 15:21:15,490 WARNING pipeline unavailable for tagging: HTTPConnectionPool(host='pipeline', port=8000): Max retries exceeded with url: /applications/3 (Caused by NameResolutionError("HTTPConnection(host='pipeline', port=8000): Failed to resolve 'pipeline' ([Errno -2] Name or service not known)"))

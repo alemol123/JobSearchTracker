@@ -1,0 +1,2 @@
+2026-11-19T15:14:40.627077717+00:00 stdout 2026-11-19 15:14:40,624 INFO applied migration 002_add_last_stage_change.sql
+2026-11-19T15:14:40.627077717+00:00 stdout 2026-11-19 15:14:40,624 INFO migrations up to date (1 applied before this run)
