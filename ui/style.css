@@ -1,32 +1,58 @@
-/* Plain CSS, no framework. Colours and spacing follow shadcn/ui's neutral "zinc"
-   design tokens, defined once here as variables. */
+/* Plain CSS, no framework. Every colour is a variable defined once here, in a pastel teal
+   theme: soft teal surfaces with dark teal text on them, so pastel never means hard to read. */
 
 :root {
-  --background: #ffffff;
-  --foreground: #09090b;
+  --background: #f6fbfa;          /* page: white with a hint of teal */
+  --foreground: #10302c;          /* text: very dark teal instead of black */
   --card: #ffffff;
-  --muted: #f4f4f5;
-  --muted-foreground: #71717a;
-  --border: #e4e4e7;
-  --primary: #18181b;
-  --primary-foreground: #fafafa;
-  --destructive: #dc2626;
-  --ring: #a1a1aa;
-  --radius: 8px;
+  --muted: #eaf5f3;               /* table hover, inactive surfaces */
+  --muted-foreground: #5b7671;
+  --border: #d3e9e5;
+  --primary: #a8e6dc;             /* pastel teal: buttons, active tab, current stage */
+  --primary-foreground: #0f4a44;  /* dark teal text on pastel teal (contrast about 8:1) */
+  --primary-strong: #2a9d8f;      /* stronger teal for bars, dots and focus rings */
+  --heading: #115e59;             /* page titles */
+  --header-from: #d6f3ee;         /* header gradient */
+  --header-to: #eef9f7;
+  --destructive: #c2410c;
+  --ring: #2a9d8f;
+  --radius: 10px;
+
+  /* message boxes: soft background, matching border, darker text */
+  --info-bg: #e6f7f4;    --info-border: #a8e6dc;    --info-text: #115e59;
+  --success-bg: #e9f8ee; --success-border: #b6e3c4; --success-text: #1f6b3a;
+  --error-bg: #fdeeee;   --error-border: #f2b8b5;   --error-text: #b42318;
+
+  /* gap page: the top three priority bars */
+  --rank-1: #f4a7a0;     /* pastel coral */
+  --rank-2: #f7c98f;     /* pastel apricot */
+  --rank-3: #f3e08a;     /* pastel butter */
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #09090b;
-    --foreground: #fafafa;
-    --card: #111113;
-    --muted: #27272a;
-    --muted-foreground: #a1a1aa;
-    --border: #27272a;
-    --primary: #fafafa;
-    --primary-foreground: #18181b;
-    --destructive: #f87171;
-    --ring: #52525b;
+    --background: #0c1716;
+    --foreground: #e3f4f1;
+    --card: #12201e;
+    --muted: #1a2d2a;
+    --muted-foreground: #8fb1ab;
+    --border: #23403b;
+    --primary: #7fd1c4;           /* pastel teal stays light; text on it stays dark */
+    --primary-foreground: #06302b;
+    --primary-strong: #5cc4b4;
+    --heading: #a8e6dc;
+    --header-from: #12302c;
+    --header-to: #0f1f1d;
+    --destructive: #fca5a5;
+    --ring: #5cc4b4;
+
+    --info-bg: #143330;    --info-border: #2a5c55;    --info-text: #a8e6dc;
+    --success-bg: #14301f; --success-border: #2b5c3c; --success-text: #a7e3b8;
+    --error-bg: #3a1716;   --error-border: #6b2a27;   --error-text: #fca5a5;
+
+    --rank-1: #e8968e;
+    --rank-2: #e9b877;
+    --rank-3: #ddc96f;
   }
 }
 
@@ -41,19 +67,23 @@ body {
   color: var(--foreground);
 }
 a { color: inherit; }
-h1 { font-size: 1.6rem; margin: 0; letter-spacing: -0.02em; }
+h1 { font-size: 1.75rem; margin: 0; letter-spacing: -0.02em; color: var(--heading); }
 h2 { font-size: 1.1rem; margin: 0 0 12px; }
 .container { max-width: 1040px; margin: 0 auto; padding: 0 16px; }
 .muted { color: var(--muted-foreground); font-size: 0.9em; }
 
 /* ---------- header and navigation ---------- */
-.site-header { border-bottom: 1px solid var(--border); margin-bottom: 24px; }
-.header-inner { display: flex; align-items: center; justify-content: space-between; gap: 16px; height: 60px; }
-.brand { font-weight: 700; text-decoration: none; }
+.site-header {
+  background: linear-gradient(90deg, var(--header-from), var(--header-to));
+  border-bottom: 1px solid var(--border); margin-bottom: 28px;
+}
+.header-inner { display: flex; align-items: center; justify-content: space-between; gap: 16px; height: 64px; }
+.brand { font-weight: 700; text-decoration: none; color: var(--heading); }
+.brand::before { content: "●"; color: var(--primary-strong); margin-right: 8px; }   /* small teal dot logo */
 nav { display: flex; gap: 4px; align-items: center; }
-nav a { text-decoration: none; padding: 6px 12px; border-radius: var(--radius); color: var(--muted-foreground); }
-nav a:hover { background: var(--muted); color: var(--foreground); }
-nav a.active { background: var(--muted); color: var(--foreground); font-weight: 600; }
+nav a { text-decoration: none; padding: 6px 14px; border-radius: 999px; color: var(--muted-foreground); }
+nav a:hover { background: var(--card); color: var(--foreground); }
+nav a.active { background: var(--primary); color: var(--primary-foreground); font-weight: 600; }
 
 .page-header { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; margin-bottom: 20px; }
 .page-header p { margin: 4px 0 0; }
@@ -76,11 +106,11 @@ button, .btn {
   padding: 7px 14px; border-radius: var(--radius); cursor: pointer; text-decoration: none;
   border: 1px solid var(--primary); background: var(--primary); color: var(--primary-foreground);
 }
-button:hover, .btn:hover { opacity: 0.9; }
+button:hover, .btn:hover { filter: brightness(0.95); }   /* a pastel gets slightly deeper on hover */
 .btn-outline { background: transparent; color: var(--foreground); border-color: var(--border); }
-.btn-outline:hover { background: var(--muted); opacity: 1; }
+.btn-outline:hover { background: var(--muted); filter: none; }
 .btn-ghost-danger { background: transparent; border-color: transparent; color: var(--destructive); }
-.btn-ghost-danger:hover { background: var(--muted); opacity: 1; }
+.btn-ghost-danger:hover { background: var(--error-bg); filter: none; }
 .btn-sm { padding: 4px 10px; font-size: 0.82rem; }
 
 input, select {
@@ -119,6 +149,7 @@ td a:hover { text-decoration: underline; }
 }
 .badge-outline { background: transparent; border-color: var(--border); }
 .badge-warning { background: #fef3c7; color: #92400e; }
+/* Stage colours, from early (cool) to late (green); closed stages are red, grey or solid green. */
 .stage-applied              { background: #f1f5f9; color: #334155; }
 .stage-phone_screen         { background: #e0f2fe; color: #075985; }
 .stage-technical_assessment { background: #ede9fe; color: #5b21b6; }
@@ -129,9 +160,28 @@ td a:hover { text-decoration: underline; }
 .stage-withdrawn            { background: #e4e4e7; color: #3f3f46; }
 .stage-accepted             { background: #15803d; color: #f0fdf4; }
 
+/* The pastel badges above would glare on a dark page: in dark mode use deep tints with light text. */
+@media (prefers-color-scheme: dark) {
+  .badge-warning              { background: #3d2e0f; color: #fcd581; }
+  .stage-applied              { background: #1e2a33; color: #cbd5e1; }
+  .stage-phone_screen         { background: #0f2d3d; color: #93d5f5; }
+  .stage-technical_assessment { background: #2a2145; color: #c4b5fd; }
+  .stage-interview            { background: #18264a; color: #a5c4fb; }
+  .stage-final_round          { background: #3a1a40; color: #f0abfc; }
+  .stage-offer                { background: #133022; color: #9ee6b4; }
+  .stage-rejected             { background: #3a1716; color: #fca5a5; }
+  .stage-withdrawn            { background: #27272a; color: #d4d4d8; }
+  .stage-accepted             { background: #1f8a4c; color: #f0fdf4; }
+}
+
 /* ---------- alerts (flash messages and form errors) ---------- */
-.alert { border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 14px; margin-bottom: 16px; font-size: 0.9rem; }
-.alert.error { border-color: var(--destructive); color: var(--destructive); }
+/* showMessage(text, kind) in app.js adds the kind as a class: info (default), success or error. */
+.alert {
+  border: 1px solid var(--info-border); border-radius: var(--radius); padding: 10px 14px;
+  margin-bottom: 16px; font-size: 0.9rem; background: var(--info-bg); color: var(--info-text);
+}
+.alert.success { background: var(--success-bg); border-color: var(--success-border); color: var(--success-text); }
+.alert.error { background: var(--error-bg); border-color: var(--error-border); color: var(--error-text); }
 .alert ul { margin: 0; padding-left: 18px; }
 
 /* ---------- pipeline progress (detail page) ---------- */
@@ -152,17 +202,21 @@ ol.timeline { list-style: none; padding: 0; margin: 0; border-left: 2px solid va
 ol.timeline li { position: relative; padding: 0 0 14px 18px; }
 ol.timeline li::before {
   content: ""; position: absolute; left: -6px; top: 6px; width: 10px; height: 10px;
-  border-radius: 50%; background: var(--primary);
+  border-radius: 50%; background: var(--primary-strong);
 }
 
 /* ---------- bars (conversion rate, priority score) ---------- */
 .bar-cell { display: flex; align-items: center; gap: 10px; min-width: 140px; }
 .bar { flex: 1; height: 8px; background: var(--muted); border-radius: 999px; overflow: hidden; }
-.bar span { display: block; height: 100%; background: var(--primary); border-radius: 999px; }
+.bar span { display: block; height: 100%; background: var(--primary-strong); border-radius: 999px; }
+/* Gap page: the three highest priorities get warm colours so what to learn first stands out. */
+#priorities tbody tr:nth-child(1) .bar span { background: var(--rank-1); }
+#priorities tbody tr:nth-child(2) .bar span { background: var(--rank-2); }
+#priorities tbody tr:nth-child(3) .bar span { background: var(--rank-3); }
 
 /* ---------- skill chips (tags on an application) ---------- */
 .chips { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; padding: 0; margin: 0; }
-.chips li { display: inline-flex; align-items: center; gap: 4px; padding: 4px 4px 4px 12px; border: 1px solid var(--border); border-radius: 999px; font-size: 0.88rem; }
+.chips li { display: inline-flex; align-items: center; gap: 4px; padding: 4px 4px 4px 12px; border: 1px solid var(--info-border); background: var(--info-bg); color: var(--info-text); border-radius: 999px; font-size: 0.88rem; }
 
 /* ---------- small screens ---------- */
 @media (max-width: 640px) {
