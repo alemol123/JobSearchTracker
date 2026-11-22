@@ -57,7 +57,7 @@
         try {
           await send("PIPELINE_URL", `/applications/${id}/stage`, "POST", { stage: select.value });
           await load();
-          showMessage("Stage updated.");
+          showMessage("Stage updated.", "success");
         } catch (error) {
           showMessage(error.message, "error");
         }

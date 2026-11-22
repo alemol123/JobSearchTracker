@@ -48,7 +48,7 @@
       try {
         await action();
         await load();
-        showMessage(successMessage);
+        showMessage(successMessage, "success");
       } catch (error) {
         showMessage(error.body?.errors || error.message, "error");
       }
